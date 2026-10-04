@@ -4,11 +4,10 @@ import { Events } from 'discord.js';
 const processedMessages = new Set();
 
 // ==========================================
-// آيديهات الرولات المسموح لها بالأوامر والردود
+// الرول الوحيدة المسموح لها بالأوامر (1414751141706731691)
 // ==========================================
 const ALLOWED_ROLES = [
-  '1391735874924052560', // الرول الأولى
-  '1414751141706731691', // الرول الجديدة
+  '1414751141706731691',
 ];
 
 export default {
@@ -42,7 +41,7 @@ export default {
     }
 
     // ==========================================
-    // التحقق من وجود إحدى الرولات المسموحة لباقي الأوامر
+    // التحقق من وجود الرول المحددة لباقي الأوامر
     // ==========================================
     const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
     if (!hasAllowedRole) return;
@@ -66,7 +65,36 @@ export default {
     // 3. الأوامر الإدارية المختصرة
     // ==========================================
 
-    // أ) امر السحب (ايا @user)
+    // أ) امر المسح (مسح 9)
+    if (command === 'مسح') {
+      const amount = parseInt(args[1]);
+      if (isNaN(amount) || amount < 1 || amount > 100) {
+        return message.reply('❌ يرجى كتابة عدد صحيح من 1 إلى 100 (مثال: `مسح 9`).').catch(() => {});
+      }
+
+      await message.delete().catch(() => {});
+      const deleted = await message.channel.bulkDelete(amount, true).catch(() => null);
+      
+      if (deleted) {
+        const msg = await message.channel.send(`✅ تم مسح **${deleted.size}** رسالة.`).catch(() => {});
+        setTimeout(() => msg?.delete().catch(() => {}), 3000);
+      }
+      return;
+    }
+
+    // ب) امر الحظر (تف @user السبب)
+    if (command === 'تف') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص المراد حظره (مثال: `تف @user`).').catch(() => {});
+      if (!targetMember.bannable) return message.reply('❌ لا يمكنني حظر هذا الشخص.').catch(() => {});
+
+      const reason = args.slice(2).join(' ') || 'بدون سبب';
+      await targetMember.ban({ reason }).catch(() => {});
+      await message.reply(`🔨 تم حظر ${targetMember.user.tag} بنجاح.`).catch(() => {});
+      return;
+    }
+
+    // ج) امر السحب (ايا @user)
     if (command === 'ايا') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `ايا @user`).').catch(() => {});
@@ -80,7 +108,7 @@ export default {
       return;
     }
 
-    // ب) امر الطرد من الصوت (قود @user)
+    // د) امر الطرد من الصوت (قود @user)
     if (command === 'قود') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `قود @user`).').catch(() => {});
@@ -91,7 +119,7 @@ export default {
       return;
     }
 
-    // ج) امر الميوت الصوتي (اسكت @user)
+    // هـ) امر الميوت الصوتي (اسكت @user)
     if (command === 'اسكت') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `اسكت @user`).').catch(() => {});
@@ -108,7 +136,7 @@ export default {
       return;
     }
 
-    // د) امر التايم أوت (تايم @user 10m)
+    // و) امر التايم أوت (تايم @user 10m)
     if (command === 'تايم') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص وكتابة المدة (مثال: `تايم @user 10m`).').catch(() => {});
