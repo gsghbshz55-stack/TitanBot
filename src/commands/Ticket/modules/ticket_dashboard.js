@@ -1,145 +1,138 @@
-.setTitle('📜 Select Transcript Channel')
-                .setDescription('Choose where auto-generated HTML transcripts will be sent when tickets are deleted.')
-                .setColor(getColor('info')),
-        ],
-        components: [new ActionRowBuilder().addComponents(channelSelect)],
-        flags: MessageFlags.Ephemeral,
-    });
+import { 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    EmbedBuilder, 
+    ChannelType, 
+    PermissionFlagsBits, 
+    MessageFlags 
+} from 'discord.js';
+import { getGuildConfig, setGuildConfig } from '../../../services/config/guildConfig.js';
+import { getColor } from '../../../config/bot.js';
 
-    const collector = rootInteraction.channel.createMessageComponentCollector({
-        componentType: ComponentType.ChannelSelect,
-        filter: i => i.user.id === selectInteraction.user.id && i.customId === 'ticket_cfg_transcript_channel',
-        time: 60_000,
-        max: 1,
-    });
+// الإعدادات المباشرة للأرومات
+const PANEL_CHANNEL_ID = '1435618260581355603';
+const TICKET_CATEGORY_ID = '1398080880236302407';
 
-    collector.on('collect', async channelInteraction => {
-        await channelInteraction.deferUpdate();
-        const channel = channelInteraction.channels.first();
+export default {
+    name: 'setup-ticket',
+    description: 'إرسال بانل التذاكر وربطه بالروم المحددة',
 
-        guildConfig.ticketTranscriptChannelId = channel.id;
+    /**
+     * أمر تثبيت البانل في الروم المحددة
+     */
+    async execute(interaction, client) {
+        const guildId = interaction.guild.id;
+
+        // جلب روم البانل
+        const channel = await interaction.guild.channels.fetch(PANEL_CHANNEL_ID).catch(() => null);
+        if (!channel) {
+            return interaction.reply({
+                content: `❌ لم يتم العثور على الروم (\`${PANEL_CHANNEL_ID}\`). تحقق من وجودها وصلاحيات البوت.`,
+                flags: MessageFlags.Ephemeral,
+            });
+        }
+
+        // تحديث إعدادات السيرفر
+        const guildConfig = await getGuildConfig(client, guildId);
+        guildConfig.ticketPanelChannelId = PANEL_CHANNEL_ID;
+        guildConfig.ticketCategoryId = TICKET_CATEGORY_ID;
+
+        // بناء Embed البانل والزر
+        const panelEmbed = new EmbedBuilder()
+            .setTitle('🎫 مركز الدعم الفني | Support Tickets')
+            .setDescription('إضغط على الزر في الأسفل لفتح تذكرة جديدة وسيقوم فريق الدعم بمساعدتك.')
+            .setColor(getColor('info') || 0x3498db);
+
+        const createBtn = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('ticket_create_btn')
+                .setLabel('فتح تذكرة')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('📩')
+        );
+
+        // إرسال البانل وحفظ الرسالة
+        const sentPanel = await channel.send({
+            embeds: [panelEmbed],
+            components: [createBtn],
+        });
+
+        guildConfig.ticketPanelMessageId = sentPanel.id;
         await setGuildConfig(client, guildId, guildConfig);
 
-        await channelInteraction.followUp({
-            embeds: [successEmbed('Transcript Channel Updated', `Ticket transcripts will be saved to ${channel}`)],
+        return interaction.reply({
+            content: `✅ تم إرسال البانل بنجاح في <#${PANEL_CHANNEL_ID}> وتخصيص إنشاء التذاكر في الكاتيغوري <#${TICKET_CATEGORY_ID}>!`,
             flags: MessageFlags.Ephemeral,
         });
+    },
 
-        await refreshDashboard(rootInteraction, guildConfig, guildId, client);
-    });
+    /**
+     * معالج زر إنشاء التكت (يتم استدعاؤه عند الضغط على الزر)
+     */
+    async handleButton(interaction) {
+        if (interaction.customId !== 'ticket_create_btn') return;
 
-    collector.on('end', (collected, reason) => {
-        if (reason === 'time' && collected.size === 0) {
-            replyUserError(selectInteraction, {
-                type: ErrorTypes.RATE_LIMIT,
-                message: 'No channel selected. No changes were made.',
-            }).catch(() => {});
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const { guild, user } = interaction;
+
+        // جلب الكاتيغوري
+        const category = await guild.channels.fetch(TICKET_CATEGORY_ID).catch(() => null);
+
+        try {
+            // إنشاء روم التكت داخل الكاتيغوري
+            const ticketChannel = await guild.channels.create({
+                name: `ticket-${user.username}`,
+                type: ChannelType.GuildText,
+                parent: category ? category.id : null,
+                permissionOverwrites: [
+                    {
+                        id: guild.id, // إخفاء الروم عن باقي الأعضاء
+                        deny: [PermissionFlagsBits.ViewChannel],
+                    },
+                    {
+                        id: user.id, // إظهار الروم لصاحب التكت
+                        allow: [
+                            PermissionFlagsBits.ViewChannel,
+                            PermissionFlagsBits.SendMessages,
+                            PermissionFlagsBits.AttachFiles,
+                            PermissionFlagsBits.ReadMessageHistory
+                        ],
+                    },
+                ],
+            });
+
+            // رسالة الترحيب داخل التكت
+            const welcomeEmbed = new EmbedBuilder()
+                .setTitle(`مرحباً بك ${user.username}`)
+                .setDescription('أهلاً بك! يرجى توضيح استفسارك أو مشكلتك هنا وانتظار رد فريق الدعم.')
+                .setColor(getColor('success') || 0x2ecc71);
+
+            const closeBtn = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('ticket_close_btn')
+                    .setLabel('إغلاق التذكرة')
+                    .setStyle(ButtonStyle.Danger)
+                    .setEmoji('🔒')
+            );
+
+            await ticketChannel.send({
+                content: `<@${user.id}>`,
+                embeds: [welcomeEmbed],
+                components: [closeBtn],
+            });
+
+            await interaction.followUp({
+                content: `✅ تم إنشاء تذكرتك بنجاح: ${ticketChannel}`,
+                flags: MessageFlags.Ephemeral,
+            });
+        } catch (error) {
+            console.error('خطأ أثناء إنشاء التذكرة:', error);
+            await interaction.followUp({
+                content: '❌ تعذر إنشاء التذكرة. تحقق من صلاحيات البوت (Manage Channels).',
+                flags: MessageFlags.Ephemeral,
+            });
         }
-    });
-}
-
-async function handleRepostPanel(btnInteraction, rootInteraction, guildConfig, guildId, client) {
-    await btnInteraction.deferUpdate();
-
-    try {
-        const sentPanel = await repostTicketPanel(client, rootInteraction.guild, guildConfig, guildId);
-
-        await btnInteraction.followUp({
-            embeds: [
-                successEmbed(
-                    'Panel Reposted',
-                    `The ticket panel has been successfully reposted to <#${guildConfig.ticketPanelChannelId}>.`,
-                ),
-            ],
-            flags: MessageFlags.Ephemeral,
-        });
-
-        await refreshDashboard(rootInteraction, guildConfig, guildId, client);
-    } catch (error) {
-        logger.error('Failed to repost ticket panel:', error);
-        await replyUserError(btnInteraction, {
-            type: ErrorTypes.CONFIGURATION,
-            message: `Could not repost the panel: ${error.message}`,
-        });
     }
-}
-
-async function handleDeleteSystem(btnInteraction, rootInteraction, guildConfig, guildId, client) {
-    await btnInteraction.deferUpdate();
-
-    const confirmButton = new ButtonBuilder()
-        .setCustomId(`ticket_cfg_confirm_delete_${guildId}`)
-        .setLabel('Confirm Reset')
-        .setStyle(ButtonStyle.Danger);
-
-    const cancelButton = new ButtonBuilder()
-        .setCustomId(`ticket_cfg_cancel_delete_${guildId}`)
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary);
-
-    const confirmRow = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    const confirmMsg = await btnInteraction.followUp({
-        embeds: [
-            new EmbedBuilder()
-                .setTitle('⚠️ Reset Ticket System Configuration')
-                .setDescription(
-                    'Are you sure you want to reset the ticket system settings?\n\n' +
-                    '**Note:** This will clear ticket channels, categories, and roles from the config. Existing ticket channels will not be deleted from the Discord server.',
-                )
-                .setColor(getColor('danger') || 0xff0000),
-        ],
-        components: [confirmRow],
-        flags: MessageFlags.Ephemeral,
-    });
-
-    const collector = confirmMsg.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        filter: i => i.user.id === btnInteraction.user.id,
-        time: 30_000,
-        max: 1,
-    });
-
-    collector.on('collect', async i => {
-        await i.deferUpdate();
-
-        if (i.customId === `ticket_cfg_confirm_delete_${guildId}`) {
-            delete guildConfig.ticketPanelChannelId;
-            delete guildConfig.ticketPanelMessageId;
-            delete guildConfig.ticketStaffRoleId;
-            delete guildConfig.ticketCategoryId;
-            delete guildConfig.ticketClosedCategoryId;
-            delete guildConfig.ticketLogsChannelId;
-            delete guildConfig.ticketTranscriptChannelId;
-            delete guildConfig.ticketPanelMessage;
-            delete guildConfig.ticketButtonLabel;
-
-            await setGuildConfig(client, guildId, guildConfig);
-
-            await i.followUp({
-                embeds: [
-                    successEmbed(
-                        'System Configuration Reset',
-                        'The ticket system configuration has been completely reset.',
-                    ),
-                ],
-                flags: MessageFlags.Ephemeral,
-            });
-
-            await InteractionHelper.safeEditReply(rootInteraction, {
-                embeds: [
-                    infoEmbed(
-                        'Dashboard Closed',
-                        'The ticket system setup was cleared. Run `/ticket setup` to reconfigure.',
-                    ),
-                ],
-                components: [],
-            }).catch(() => {});
-        } else {
-            await i.followUp({
-                embeds: [infoEmbed('Cancelled', 'Reset action cancelled.')],
-                flags: MessageFlags.Ephemeral,
-            });
-        }
-    });
-}
+};
