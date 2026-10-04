@@ -15,12 +15,11 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
-      // 1. نظام الضريبة التلقائي (يدعم الأرقام العادية واختصارات مثل k, m, b)
+      // 1. نظام الضريبة التلقائي (يدعم الأرقام واختصارات k, m, b)
       if (message.channel.id === TAX_CHANNEL_ID) {
         const cleanContent = message.content.trim().toLowerCase();
         let amount = null;
 
-        // التحقق مما إذا كان المدخل رقماً عادياً أو يحتوي على اختصارات (k, m, b)
         const match = cleanContent.match(/^(\d+(?:\.\d+)?)([kmb])?$/);
         
         if (match) {
@@ -67,17 +66,18 @@ export default {
             .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
             .setTimestamp();
 
+          // الأزرار مفعلة وتحمل المبلغ داخل الـ customId
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setCustomId('tax_btn')
+              .setCustomId(`tax_btn_${amount}`)
               .setLabel('Tax')
               .setStyle(ButtonStyle.Primary)
-              .setDisabled(true),
+              .setDisabled(false),
             new ButtonBuilder()
-              .setCustomId('mediator_btn')
+              .setCustomId(`mediator_btn_${amount}`)
               .setLabel('Mediator')
               .setStyle(ButtonStyle.Secondary)
-              .setDisabled(true)
+              .setDisabled(false)
           );
 
           await message.channel.send({
