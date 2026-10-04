@@ -1,10 +1,15 @@
 import { Events } from "discord.js";
+import { joinVoiceChannel, VoiceConnectionStatus, entersState } from '@discordjs/voice';
 import { logger, startupLog } from "../utils/logger.js";
 import config from "../config/application.js";
 import { reconcileReactionRoleMessages } from "../services/reactionRoleService.js";
 import { reconcileTicketPanels, reconcileVerificationPanels, reconcileReactionRolePanelHealth } from "../services/panelHealthService.js";
 import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
+
+// الآيديات الخاصة بالروم الصوتي والسيرفر
+const VOICE_CHANNEL_ID = '1415546159417655346';
+const GUILD_ID = '1343103634761715755';
 
 export default {
   name: Events.ClientReady,
@@ -20,6 +25,47 @@ export default {
 
       if (client.config?.features?.music) {
         initRiffyAfterReady(client);
+      }
+
+      // نظام البقاء في الروم الصوتي (24/7) وإعادة الاتصال التلقائي
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (guild) {
+        const channel = guild.channels.cache.get(VOICE_CHANNEL_ID);
+        if (channel && channel.type === 2) { // 2 تعني روم صوتي
+          async function connectToVoice() {
+            try {
+              const connection = joinVoiceChannel({
+                channelId: channel.id,
+                guildId: guild.id,
+                adapterCreator: guild.voiceAdapterCreator,
+                selfDeaf: true,
+                selfMute: true
+              });
+
+              connection.on(VoiceConnectionStatus.Disconnected, async () => {
+                try {
+                  await entersState(connection, VoiceConnectionStatus.Connecting, 5_000);
+                } catch (error) {
+                  logger.warn('Voice connection lost. Reconnecting...');
+                  connection.destroy();
+                  setTimeout(connectToVoice, 3000);
+                }
+              });
+
+              connection.on(VoiceConnectionStatus.Ready, () => {
+                startupLog(`Bot successfully joined and staying in voice channel: ${channel.name}`);
+              });
+            } catch (error) {
+              logger.error('Error in voice connection:', error);
+              setTimeout(connectToVoice, 5000);
+            }
+          }
+          connectToVoice();
+        } else {
+          logger.error('Voice 24/7: Voice channel not found or invalid type!');
+        }
+      } else {
+        logger.error('Voice 24/7: Guild not found!');
       }
 
       const reconciliationSummary = await reconcileReactionRoleMessages(client);
