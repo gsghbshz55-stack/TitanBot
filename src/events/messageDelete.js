@@ -1,4 +1,3 @@
-
 import { Events } from 'discord.js';
 import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { logger } from '../utils/logger.js';
@@ -13,13 +12,25 @@ export default {
 
   async execute(message) {
     try {
+      // إذا كانت الرسالة غير مكتملة (Partial)، نقوم بجلبها لتجنب الأخطاء
+      if (message.partial) {
+        try {
+          message = await message.fetch();
+        } catch (fetchError) {
+          return; // إذا لم نستطيع جلبها، نتجاهل الحدث بهدوء
+        }
+      }
+
       if (!message.guild) return;
+
+      // تجاهل الرسائل المحذوفة التي تخص البوتات تماماً (لتجنب التداخل مع حذف الاقتراحات والآراء)
+      if (message.author?.bot) return;
 
       try {
         const reactionRoleData = await getReactionRoleMessage(message.client, message.guild.id, message.id);
         if (reactionRoleData) {
           await deleteReactionRoleMessage(message.client, message.guild.id, message.id);
-          logger.info(`Cleaned up reaction role database entry for manually deleted message ${message.id} in guild ${message.guild.id}`);
+          logger.info(`Cleaned up reaction role database entry for manually deleted message ${message.id} in guild${message.guild.id}`);
 
           try {
             await logEvent({
@@ -29,7 +40,7 @@ export default {
               data: {
                 title: 'Reaction Role Removed',
                 lines: [
-                  formatLogLine('Channel', message.channel ? `${message.channel.name} ${message.channel.toString()}` : 'Unknown'),
+                  formatLogLine('Channel', message.channel ? `${message.channel.name}${message.channel.toString()}` : 'Unknown'),
                   formatLogLine('Message ID', `\`${message.id}\``),
                   formatLogLine('Cleanup', 'Database entry removed automatically'),
                 ],
@@ -44,10 +55,8 @@ export default {
         logger.warn(`Failed to clean up reaction role data for deleted message ${message.id}:`, reactionRoleCleanupError);
       }
 
-      if (message.author?.bot) return;
-
       const metaLines = [
-        formatLogLine('Channel', message.channel ? `${message.channel.name} ${message.channel.toString()}` : 'Unknown'),
+        formatLogLine('Channel', message.channel ? `${message.channel.name}${message.channel.toString()}` : 'Unknown'),
         formatLogLine('Message ID', `\`${message.id}\``),
         formatLogLine('Message author', message.author ? message.author.toString() : 'Unknown'),
         formatLogLine('Message created', `<t:${Math.floor(message.createdTimestamp / 1000)}:R>`),
