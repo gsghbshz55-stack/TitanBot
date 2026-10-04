@@ -4,6 +4,9 @@ import { logger } from '../utils/logger.js';
 // آيدي روم الاقتراحات
 const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 
+// مجموعة لحفظ آيديات الرسائل التي تم معالجتها لمنع التكرار
+const processedMessages = new Set();
+
 export default {
   name: Events.MessageCreate,
   async execute(message, client) {
@@ -15,13 +18,20 @@ export default {
         const suggestionText = message.content;
         if (!suggestionText) return;
 
-        // حذف رسالة العضو الأصلية تماماً لكي لا تظهر في الشات
+        // منع تكرار معالجة نفس الرسالة
+        if (processedMessages.has(message.id)) return;
+        processedMessages.add(message.id);
+
+        // تنظيف الآيدي من القائمة بعد دقيقة لتخفيف الذاكرة
+        setTimeout(() => processedMessages.delete(message.id), 60000);
+
+        // حذف رسالة العضو الأصلية فوراً
         await message.delete().catch(() => {});
 
         // رابط الخط المتحرك
         const lineGifUrl = 'https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac39330&is=6ac241b0&hm=a59fa9266ef864e2fbf9d7f6b1d369c6fb4381d859482fab5f15a31dbf48187d&';
 
-        // تصميم إمبد الاقتراح (النص يظهر داخل الإمبد فقط)
+        // تصميم إمبد الاقتراح مرة واحدة فقط
         const suggestEmbed = new EmbedBuilder()
           .setAuthor({
             name: `Suggested by ${message.author.username}`,
@@ -46,7 +56,7 @@ export default {
             .setEmoji('👎')
         );
 
-        // إرسال الاقتراح في الروم
+        // إرسال الاقتراح مرة واحدة فقط
         const sentMessage = await message.channel.send({
           embeds: [suggestEmbed],
           components: [buttons]
@@ -55,7 +65,7 @@ export default {
         });
 
         if (sentMessage) {
-          // فتح ثريد المناقشة فارغاً
+          // فتح ثريد المناقشة فارغاً مرة واحدة
           await sentMessage.startThread({
             name: `Discussion - ${message.author.username}`,
             autoArchiveDuration: 1440,
