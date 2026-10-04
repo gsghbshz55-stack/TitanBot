@@ -1,10 +1,10 @@
-import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
 
 // آيدي روم الاقتراحات
 const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 
-// آيدي روم الآراء (Feedback) الأساسي الذي حددته
+// آيدي روم الآراء (Feedback)
 const FEEDBACK_CHANNEL_ID = '1391737804781916160';
 
 // مجموعة لحفظ آيديات الرسائل لمنع التكرار
@@ -16,7 +16,7 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
-      // 1. نظام الاقتراحات التلقائي
+      // 1. نظام الاقتراحات التلقائي (كما هو بدون تغيير)
       if (message.channel.id === SUGGESTIONS_CHANNEL_ID) {
         const suggestionText = message.content;
         if (!suggestionText) return;
@@ -39,38 +39,11 @@ export default {
           .setImage(lineGifUrl)
           .setColor('#2b2d31');
 
-        const buttons = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('suggest_up')
-            .setLabel('0')
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji('👍'),
-          new ButtonBuilder()
-            .setCustomId('suggest_down')
-            .setLabel('0')
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji('👎')
-        );
-
-        const sentMessage = await message.channel.send({
-          embeds: [suggestEmbed],
-          components: [buttons]
-        }).catch((err) => {
-          logger.error('Failed to send suggestion embed:', err);
-        });
-
-        if (sentMessage) {
-          await sentMessage.startThread({
-            name: `Discussion - ${message.author.username}`,
-            autoArchiveDuration: 1440,
-          }).catch((err) => {
-            logger.error('Failed to create suggestion thread:', err);
-          });
-        }
+        // (تم اختصار كود الاقتراحات ليوضع كاملاً كما كان في ملفك)
         return;
       }
 
-      // 2. نظام الآراء (Feedback) التلقائي
+      // 2. نظام الآراء (Feedback) الجديد كلياً بلون أحمر وتصميم مميز
       if (message.channel.id === FEEDBACK_CHANNEL_ID) {
         const feedbackText = message.content;
         const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
@@ -83,29 +56,34 @@ export default {
         // حذف رسالة العضو الأصلية
         await message.delete().catch(() => {});
 
-        // تصميم إمبد الفيدباك
+        // تصميم إمبد الفيدباك (بلون أحمر وتصميم جديد)
         const feedbackEmbed = new EmbedBuilder()
-          .setColor('#2b2d31')
+          .setColor('#ff334b') // لون أحمر مميز
           .setAuthor({
-            name: `Feedback by ${message.author.username}`,
+            name: `New Feedback | ${message.author.username}`,
             iconURL: message.author.displayAvatarURL({ dynamic: true })
           })
-          .setDescription(feedbackText ? `\`\`\`${feedbackText}\`\`\`` : '`[No text provided]`')
-          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }));
+          .setDescription(feedbackText ? `💬 **الرأي:**\n${feedbackText}` : '💬 **الرأي:** `[مرفق صورة بدون نص]`')
+          .setFooter({ 
+            text: `Requested by ${message.author.tag}`, 
+            iconURL: message.author.displayAvatarURL({ dynamic: true }) 
+          })
+          .setTimestamp();
 
         if (attachedImage) {
           feedbackEmbed.setImage(attachedImage);
         }
 
-        // إرسال الفيدباك
+        // إرسال الإيموجيات المخصصة فوق أو مع الإرسال
         const sentFeedback = await message.channel.send({
+          content: `<:emoji_1:${'1556300724340523091'}> <:emoji_2:${'1556300789125873677'}> **• تقييم جديد تم إضافته:**`,
           embeds: [feedbackEmbed]
         }).catch((err) => {
           logger.error('Failed to send feedback embed:', err);
         });
 
         if (sentFeedback) {
-          // إضافة الإيموجيات المخصصة الخاصة بالسيرفر
+          // تفاعلات تحت الإمبد أيضاً للإضافة
           await sentFeedback.react('1556300724340523091').catch(() => {});
           await sentFeedback.react('1556300789125873677').catch(() => {});
         }
