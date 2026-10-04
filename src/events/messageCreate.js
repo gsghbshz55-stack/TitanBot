@@ -30,22 +30,18 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
-      // 1. معالج لعبة العد
+      // 1. لعبة العد
       const countingProcessed = await handleCountingGame(message, client);
-      if (countingProcessed) {
-        return;
-      }
+      if (countingProcessed) return;
 
-      // 2. معالج الردود التلقائية (تمت إضافته هنا)
+      // 2. الردود التلقائية
       const autoResponseProcessed = await handleAutoResponse(message);
-      if (autoResponseProcessed) {
-        return; // إذا تم الرد تلقائياً يتوقف البوت ولن يحسب أوامر أو إكس بي
-      }
+      if (autoResponseProcessed) return;
 
-      // 3. معالج أوردة البادئة (Prefix Commands)
+      // 3. معالج الأوامر
       await handlePrefixCommand(message, client);
 
-      // 4. معالج نظام المستويات (Leveling)
+      // 4. معالج XP / المستويات
       await handleLeveling(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
@@ -54,37 +50,33 @@ export default {
 };
 
 // ==========================================
-// دالة الرد التلقائي الجديد
+// دالة الرد التلقائي
 // ==========================================
 async function handleAutoResponse(message) {
   try {
     const content = message.content.trim().toLowerCase();
 
-    // 1. إذا كتب ip
     if (content === 'ip') {
       await message.reply('144.217.62.159:7777');
       return true;
     }
 
-    // 2. إذا كتب fayt
     if (content === 'fayt') {
       await message.reply('pr.sampdroid.app:7777');
       return true;
     }
 
-    // 3. إذا كتب خط
     if (content === 'خط') {
       await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&');
       return true;
     }
 
-    // 4. إذا كتب رابط
     if (content === 'رابط') {
-      await message.reply(`𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq`);
+      await message.reply('𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq');
       return true;
     }
 
-    return false; // لم يتطابق أي نص
+    return false;
   } catch (error) {
     logger.error('Error handling auto response:', error);
     return false;
@@ -97,9 +89,7 @@ async function handlePrefixCommand(message, client) {
     const prefix = guildConfig?.prefix || getCommandPrefix();
     const parsed = parsePrefixCommand(message.content, prefix);
     
-    if (!parsed) {
-      return; 
-    }
+    if (!parsed) return;
 
     let { commandName, args } = parsed;
     const musicPrefixShortcut = commandName.toLowerCase();
@@ -109,16 +99,10 @@ async function handlePrefixCommand(message, client) {
       args = [musicPrefixShortcut, ...args];
     }
 
-    logger.info(`Prefix command detected: ${commandName}, args: ${args.join(', ')}`);
-
     const resolvedCommandName = resolveCommandAlias(commandName);
-    logger.info(`Resolved command name: ${resolvedCommandName}`);
     const command = client.commands.get(resolvedCommandName);
 
-    if (!command) {
-      logger.warn(`Command not found: ${resolvedCommandName}`);
-      return; 
-    }
+    if (!command) return;
 
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
       await message.channel.send({
@@ -185,8 +169,6 @@ async function handlePrefixCommand(message, client) {
       return;
     }
 
-    logger.info(`Executing prefix command: ${prefix}${commandName} (resolved to ${resolvedCommandName}) by ${message.author.tag}`);
-    
     await executePrefixCommand(command, message, args, client, prefix, guildConfig);
   } catch (error) {
     logger.error('Error handling prefix command:', error);
@@ -233,46 +215,30 @@ async function handleLeveling(message, client) {
   try {
     const rateLimitKey = `xp-event:${message.guild.id}:${message.author.id}`;
     const canProcess = await checkRateLimit(rateLimitKey, MESSAGE_XP_RATE_LIMIT_ATTEMPTS, MESSAGE_XP_RATE_LIMIT_WINDOW_MS);
-    if (!canProcess) {
-      return;
-    }
+    if (!canProcess) return;
 
     const levelingConfig = await getLevelingConfig(client, message.guild.id);
-    
-    if (!levelingConfig?.enabled) {
-      return;
-    }
+    if (!levelingConfig?.enabled) return;
 
-    if (levelingConfig.ignoredChannels?.includes(message.channel.id)) {
-      return;
-    }
+    if (levelingConfig.ignoredChannels?.includes(message.channel.id)) return;
 
     if (levelingConfig.ignoredRoles?.length > 0) {
-      const member = await message.guild.members.fetch(message.author.id).catch(() => {
-        return null;
-      });
+      const member = await message.guild.members.fetch(message.author.id).catch(() => null);
       if (member && member.roles.cache.some(role => levelingConfig.ignoredRoles.includes(role.id))) {
         return;
       }
     }
 
-    if (levelingConfig.blacklistedUsers?.includes(message.author.id)) {
-      return;
-    }
+    if (levelingConfig.blacklistedUsers?.includes(message.author.id)) return;
 
-    if (!message.content || message.content.trim().length === 0) {
-      return;
-    }
+    if (!message.content || message.content.trim().length === 0) return;
 
     const userData = await getUserLevelData(client, message.guild.id, message.author.id);
-
     const cooldownTime = levelingConfig.xpCooldown || 60;
     const now = Date.now();
     const timeSinceLastMessage = now - (userData.lastMessage || 0);
 
-    if (timeSinceLastMessage < cooldownTime * 1000) {
-      return;
-    }
+    if (timeSinceLastMessage < cooldownTime * 1000) return;
 
     const minXP = levelingConfig.xpRange?.min || levelingConfig.xpPerMessage?.min || 15;
     const maxXP = levelingConfig.xpRange?.max || levelingConfig.xpPerMessage?.max || 25;
@@ -287,13 +253,7 @@ async function handleLeveling(message, client) {
       finalXP = Math.floor(finalXP * levelingConfig.xpMultiplier);
     }
 
-    const result = await addXp(client, message.guild, message.member, finalXP);
-
-    if (result?.leveledUp) {
-      logger.info(
-        `${message.author.tag} leveled up to level ${result.level} in ${message.guild.name}`
-      );
-    }
+    await addXp(client, message.guild, message.member, finalXP);
   } catch (error) {
     logger.error('Error handling leveling for message:', error);
   }
