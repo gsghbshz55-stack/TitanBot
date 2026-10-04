@@ -55,20 +55,13 @@ export default {
         });
 
         if (sentMessage) {
-          // فتح ثريد المناقشة تلقائياً
-          const thread = await sentMessage.startThread({
+          // فتح ثريد المناقشة فارغاً بدون رسائل إضافية
+          await sentMessage.startThread({
             name: `Discussion - ${message.author.username}`,
             autoArchiveDuration: 1440,
           }).catch((err) => {
             logger.error('Failed to create suggestion thread:', err);
           });
-
-          // إرسال رسالة تلقائية داخل الثريد لكي لا يظهر فارغاً
-          if (thread) {
-            await thread.send({
-              content: `Discuss this suggestion here.`
-            }).catch(() => {});
-          }
         }
 
         return;
