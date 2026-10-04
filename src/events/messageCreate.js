@@ -4,9 +4,6 @@ import { logger } from '../utils/logger.js';
 // آيدي روم الاقتراحات
 const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 
-// آيدي روم الآراء (Feedback) الجديد
-const FEEDBACK_CHANNEL_ID = '1391737804781916160';
-
 // مجموعة لحفظ آيديات الرسائل التي تم معالجتها لمنع التكرار
 const processedMessages = new Set();
 
@@ -45,7 +42,7 @@ export default {
           .setImage(lineGifUrl)
           .setColor('#2b2d31');
 
-        // أزرار التصويت للاقتراحات
+        // أزرار التصويت
         const buttons = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId('suggest_up')
@@ -80,52 +77,7 @@ export default {
         return;
       }
 
-      // 2. نظام الآراء (Feedback) التلقائي
-      if (message.channel.id === FEEDBACK_CHANNEL_ID) {
-        const feedbackText = message.content;
-        const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
-        if (!feedbackText && !attachedImage) return;
-
-        // منع تكرار معالجة نفس الرسالة
-        if (processedMessages.has(message.id)) return;
-        processedMessages.add(message.id);
-
-        setTimeout(() => processedMessages.delete(message.id), 60000);
-
-        // حذف رسالة العضو الأصلية فوراً ليبقى الروم منظماً
-        await message.delete().catch(() => {});
-
-        // تصميم إمبد الفيدباك
-        const feedbackEmbed = new EmbedBuilder()
-          .setColor('#2b2d31')
-          .setAuthor({
-            name: `Feedback by ${message.author.username}`,
-            iconURL: message.author.displayAvatarURL({ dynamic: true })
-          })
-          .setDescription(feedbackText ? `\`\`\`${feedbackText}\`\`\`` : '`[No text provided]`')
-          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }));
-
-        if (attachedImage) {
-          feedbackEmbed.setImage(attachedImage);
-        }
-
-        // إرسال رسالة الفيدباك في الروم
-        const sentFeedback = await message.channel.send({
-          embeds: [feedbackEmbed]
-        }).catch((err) => {
-          logger.error('Failed to send feedback embed:', err);
-        });
-
-        if (sentFeedback) {
-          // إضافة إيموجيات سيرفرك المخصصة تلقائياً للتقييم
-          await sentFeedback.react('1556300724340523091').catch(() => {});
-          await sentFeedback.react('1556300789125873677').catch(() => {});
-        }
-
-        return;
-      }
-
-      // 3. نظام تغيير اسم التكت تلقائياً
+      // 2. نظام تغيير اسم التكت تلقائياً
       await handleTicketAutoRename(message);
 
     } catch (error) {
@@ -164,3 +116,4 @@ async function handleTicketAutoRename(message) {
     logger.error('Error handling ticket rename:', error);
   }
 }
+
