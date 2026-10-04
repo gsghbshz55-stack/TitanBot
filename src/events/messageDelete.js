@@ -4,7 +4,7 @@ import { logger } from '../utils/logger.js';
 // آيديات الرومات
 const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 const FEEDBACK_CHANNEL_ID = '1391737804781916160';
-const TAX_CHANNEL_ID = '1391737798473678882'; // روم أوامر الضريبة مثل بروبوت
+const TAX_CHANNEL_ID = '1415584488401928292'; // روم الضريبة التلقائي
 
 // مجموعة لحفظ آيديات الرسائل لمنع التكرار
 const processedMessages = new Set();
@@ -15,23 +15,30 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
-      const content = message.content.trim();
-
-      // 1. نظام الضريبة (يعمل في الروم المخصص لو كتب العضو الرقم مباشرة أو استخدم -tax أو ك)
+      // 1. نظام الضريبة التلقائي (يدعم الأرقام العادية واختصارات مثل k, m, b)
       if (message.channel.id === TAX_CHANNEL_ID) {
+        const cleanContent = message.content.trim().toLowerCase();
         let amount = null;
 
-        if (/^\d+$/.test(content)) {
-          amount = parseInt(content, 10);
-        } else if (content.startsWith('-tax') || content.startsWith('ك')) {
-          const args = content.split(/\s+/);
-          const numArg = args[1];
-          if (numArg && /^\d+$/.test(numArg)) {
-            amount = parseInt(numArg, 10);
+        // التحقق مما إذا كان المدخل رقماً عادياً أو يحتوي على اختصارات (k, m, b)
+        const match = cleanContent.match(/^(\d+(?:\.\d+)?)([kmb])?$/);
+        
+        if (match) {
+          const num = parseFloat(match[1]);
+          const suffix = match[2];
+
+          if (suffix === 'k') {
+            amount = Math.floor(num * 1000);
+          } else if (suffix === 'm') {
+            amount = Math.floor(num * 1000000);
+          } else if (suffix === 'b') {
+            amount = Math.floor(num * 1000000000);
+          } else if (!suffix) {
+            amount = Math.floor(num);
           }
         }
 
-        if (amount !== null) {
+        if (amount !== null && amount > 0) {
           if (processedMessages.has(message.id)) return;
           processedMessages.add(message.id);
           setTimeout(() => processedMessages.delete(message.id), 60000);
