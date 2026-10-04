@@ -1,12 +1,23 @@
 import { Events } from 'discord.js';
 
+// منع معالجة الرسائل المكررة
+const processedMessages = new Set();
+
 export default {
   name: Events.MessageCreate,
   async execute(message) {
     // تجاهل البوتات والرسائل الخاصة
     if (message.author.bot || !message.guild) return;
 
-    // تنظيف النص المقروء
+    // التأكد من عدم تكرار الرد لنفس الرسالة
+    if (processedMessages.has(message.id)) return;
+    processedMessages.add(message.id);
+
+    // تنظيف ذاكرة الرسائل المعالجة بعد 5 ثوانٍ
+    setTimeout(() => {
+      processedMessages.delete(message.id);
+    }, 5000);
+
     const content = message.content.trim().toLowerCase();
 
     // ==========================================
