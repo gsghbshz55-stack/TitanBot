@@ -8,7 +8,7 @@ import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.j
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 
 // الآيديات الخاصة بك
-const VOICE_CHANNEL_ID = '1415546159417655346';
+const VOICE_CHANNEL_ID = '1343103634761715755';
 const GUILD_ID = '1415546159417655346';
 
 export default {
