@@ -30,19 +30,66 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
+      // 1. معالج لعبة العد
       const countingProcessed = await handleCountingGame(message, client);
       if (countingProcessed) {
         return;
       }
 
+      // 2. معالج الردود التلقائية (تمت إضافته هنا)
+      const autoResponseProcessed = await handleAutoResponse(message);
+      if (autoResponseProcessed) {
+        return; // إذا تم الرد تلقائياً يتوقف البوت ولن يحسب أوامر أو إكس بي
+      }
+
+      // 3. معالج أوردة البادئة (Prefix Commands)
       await handlePrefixCommand(message, client);
 
+      // 4. معالج نظام المستويات (Leveling)
       await handleLeveling(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
   }
 };
+
+// ==========================================
+// دالة الرد التلقائي الجديد
+// ==========================================
+async function handleAutoResponse(message) {
+  try {
+    const content = message.content.trim().toLowerCase();
+
+    // 1. إذا كتب ip
+    if (content === 'ip') {
+      await message.reply('144.217.62.159:7777');
+      return true;
+    }
+
+    // 2. إذا كتب fayt
+    if (content === 'fayt') {
+      await message.reply('pr.sampdroid.app:7777');
+      return true;
+    }
+
+    // 3. إذا كتب خط
+    if (content === 'خط') {
+      await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&');
+      return true;
+    }
+
+    // 4. إذا كتب رابط
+    if (content === 'رابط') {
+      await message.reply(`𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq`);
+      return true;
+    }
+
+    return false; // لم يتطابق أي نص
+  } catch (error) {
+    logger.error('Error handling auto response:', error);
+    return false;
+  }
+}
 
 async function handlePrefixCommand(message, client) {
   try {
