@@ -18,7 +18,7 @@ export default {
         // حذف رسالة العضو الأصلية
         await message.delete().catch(() => {});
 
-        // رابط الخط المتحرك الذي أرسلته
+        // رابط الخط المتحرك
         const lineGifUrl = 'https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac39330&is=6ac241b0&hm=a59fa9266ef864e2fbf9d7f6b1d369c6fb4381d859482fab5f15a31dbf48187d&';
 
         // تصميم إمبد الاقتراح مع صورة الشخص على اليمين والخط المتحرك في الأسفل
@@ -28,8 +28,8 @@ export default {
             iconURL: message.author.displayAvatarURL({ dynamic: true })
           })
           .setDescription(suggestionText)
-          .setThumbnail(message.author.displayAvatarURL({ dynamic: true })) // صورة صاحب الاقتراح على اليمين
-          .setImage(lineGifUrl) // الخط المتحرك كفاصل في الأسفل
+          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+          .setImage(lineGifUrl)
           .setColor('#2b2d31');
 
         // أزرار التصويت
@@ -46,7 +46,7 @@ export default {
             .setEmoji('👎')
         );
 
-        // إرسال الاقتراح في الروم
+        // إرسال الاقتراح في الروم مع أزرار التصويت
         const sentMessage = await message.channel.send({
           embeds: [suggestEmbed],
           components: [buttons]
@@ -55,13 +55,20 @@ export default {
         });
 
         if (sentMessage) {
-          // فتح ثريد المناقشة
-          await sentMessage.startThread({
+          // فتح ثريد المناقشة تلقائياً
+          const thread = await sentMessage.startThread({
             name: `Discussion - ${message.author.username}`,
             autoArchiveDuration: 1440,
           }).catch((err) => {
             logger.error('Failed to create suggestion thread:', err);
           });
+
+          // إرسال رسالة تلقائية داخل الثريد لكي لا يظهر فارغاً
+          if (thread) {
+            await thread.send({
+              content: `Discuss this suggestion here.`
+            }).catch(() => {});
+          }
         }
 
         return;
