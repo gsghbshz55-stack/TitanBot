@@ -51,3 +51,5 @@ export default {
     }
   },
 };
+
+دا الكود خاص  بي  ready
