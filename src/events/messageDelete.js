@@ -10,13 +10,15 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
-      // 1. تشغيل نظام الاقتراحات التلقائي إذا كانت الرسالة في روم الاقتراحات
+      // 1. نظام الاقتراحات التلقائي
       if (message.channel.id === SUGGESTIONS_CHANNEL_ID) {
         const suggestionText = message.content;
         if (!suggestionText) return;
 
-        // حذف رسالة العضو الأصلية لكي يظهر الاقتراح منظماً بتوقيع البوت
-        await message.delete().catch(() => {});
+        // محاولة حذف رسالة العضو
+        await message.delete().catch((err) => {
+          logger.error('Failed to delete suggestion message (Check Manage Messages permission):', err);
+        });
 
         // تصميم إمبد الاقتراح
         const suggestEmbed = new EmbedBuilder()
@@ -27,7 +29,7 @@ export default {
           .setDescription(suggestionText)
           .setColor('#2b2d31');
 
-        // أزرار التصويت (لايك ودسلايك بأعداد تبدأ من الصفر)
+        // أزرار التصويت
         const buttons = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId('suggest_up')
@@ -45,18 +47,24 @@ export default {
         const sentMessage = await message.channel.send({
           embeds: [suggestEmbed],
           components: [buttons]
+        }).catch((err) => {
+          logger.error('Failed to send suggestion embed:', err);
         });
 
-        // فتح ثريد (مناقشة) تحت الاقتراح تلقائياً
-        await sentMessage.startThread({
-          name: `Discussion - ${message.author.username}`,
-          autoArchiveDuration: 1440,
-        }).catch(() => {});
+        if (sentMessage) {
+          // فتح ثريد المناقشة
+          await sentMessage.startThread({
+            name: `Discussion - ${message.author.username}`,
+            autoArchiveDuration: 1440,
+          }).catch((err) => {
+            logger.error('Failed to create suggestion thread (Check Create Public Threads permission):', err);
+          });
+        }
 
-        return; // إنهاء التنفيذ هنا حتى لا يتداخل مع التكتات
+        return;
       }
 
-      // 2. تشغيل نظام تغيير اسم التكت تلقائياً
+      // 2. نظام تغيير اسم التكت تلقائياً
       await handleTicketAutoRename(message);
 
     } catch (error) {
@@ -65,7 +73,6 @@ export default {
   },
 };
 
-// دالة تغيير اسم التكت التلقائية
 async function handleTicketAutoRename(message) {
   try {
     const channel = message.channel;
