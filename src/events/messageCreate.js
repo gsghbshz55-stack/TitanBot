@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 // منع معالجة الرسائل المكررة
 const processedMessages = new Set();
@@ -10,11 +10,67 @@ const ALLOWED_ROLES = [
   '1414751141706731691',
 ];
 
+// آيدي روم الاقتراحات الذي طلبته
+const SUGGESTION_CHANNEL_ID = '1437792846907183165';
+
 export default {
   name: Events.MessageCreate,
   async execute(message) {
     // تجاهل البوتات والرسائل الخاصة
     if (message.author.bot || !message.guild) return;
+
+    // ==========================================
+    // نظام الاقتراحات التلقائي في الروم المحدد
+    // ==========================================
+    if (message.channel.id === SUGGESTION_CHANNEL_ID) {
+      const suggestionText = message.content;
+      const attachedImage = message.attachments.first() ? message.attachments.first().url : message.author.displayAvatarURL({ dynamic: true });
+
+      try {
+        // حذف رسالة العضو الأصلية فوراً لتنظيم الروم
+        await message.delete();
+
+        // بناء تصميم الـ Embed المطابق للشكل المطلوب
+        const embed = new EmbedBuilder()
+          .setColor('#2b2d31')
+          .setAuthor({
+            name: `Suggested by ${message.author.username}`,
+            iconURL: message.author.displayAvatarURL({ dynamic: true })
+          })
+          .setDescription(`\`\`\`${suggestionText}\`\`\``)
+          .setThumbnail(attachedImage);
+
+        // أزرار التصويت مع الإيموجي المخصص الخاص بك
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('suggestion_upvote')
+            .setLabel('0')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji({ id: '1556268829879836793' }),
+          new ButtonBuilder()
+            .setCustomId('suggestion_downvote')
+            .setLabel('0')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji({ id: '1556268829879836793' })
+        );
+
+        // إرسال الاقتراح الجديد
+        const sentMessage = await message.channel.send({
+          embeds: [embed],
+          components: [row]
+        });
+
+        // فتح ثريد تلقائي للمناقشة تحت رسالة الاقتراح
+        await sentMessage.startThread({
+          name: `Discussion - ${message.author.username}`,
+          autoArchiveDuration: 1440
+        });
+
+      } catch (error) {
+        console.error('حدث خطأ أثناء معالجة الاقتراح:', error);
+      }
+      return; // إيقاف التنفيذ لكي لا يعالج الأوامر العادية في روم الاقتراحات
+    }
 
     // التأكد من عدم تكرار الرد لنفس الرسالة
     if (processedMessages.has(message.id)) return;
