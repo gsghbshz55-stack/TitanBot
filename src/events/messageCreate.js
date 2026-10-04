@@ -1,92 +1,108 @@
 import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { logger } from '../utils/logger.js';
 
-const processedMessages = new Set();
-
-const ALLOWED_ROLES = [
-  '1414751141706731691',
-];
-
-const SUGGESTION_CHANNEL_ID = '1437792846907183165';
+// آيدي روم الاقتراحات
+const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 
 export default {
   name: Events.MessageCreate,
-  async execute(message) {
-    if (message.author.bot || !message.guild) return;
+  async execute(message, client) {
+    try {
+      if (message.author.bot || !message.guild) return;
 
-    // فحص للتأكد هل البوت دخل روم الاقتراحات أم لا
-    if (message.channel.id === SUGGESTION_CHANNEL_ID) {
-      console.log(`[Suggestion System] تم استلام رسالة في روم الاقتراحات من: ${message.author.tag}`);
-      
-      const suggestionText = message.content;
-      const attachedImage = message.attachments.first() ? message.attachments.first().url : message.author.displayAvatarURL({ dynamic: true });
+      // 1. نظام الاقتراحات التلقائي
+      if (message.channel.id === SUGGESTIONS_CHANNEL_ID) {
+        const suggestionText = message.content;
+        if (!suggestionText) return;
 
-      try {
-        await message.delete();
+        // حذف رسالة العضو الأصلية
+        await message.delete().catch(() => {});
 
-        const embed = new EmbedBuilder()
-          .setColor('#2b2d31')
+        // رابط الخط المتحرك الذي أرسلته
+        const lineGifUrl = 'https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac39330&is=6ac241b0&hm=a59fa9266ef864e2fbf9d7f6b1d369c6fb4381d859482fab5f15a31dbf48187d&';
+
+        // تصميم إمبد الاقتراح مع صورة الشخص على اليمين والخط المتحرك في الأسفل
+        const suggestEmbed = new EmbedBuilder()
           .setAuthor({
             name: `Suggested by ${message.author.username}`,
             iconURL: message.author.displayAvatarURL({ dynamic: true })
           })
-          .setDescription(`\`\`\`${suggestionText}\`\`\``)
-          .setThumbnail(attachedImage);
+          .setDescription(suggestionText)
+          .setThumbnail(message.author.displayAvatarURL({ dynamic: true })) // صورة صاحب الاقتراح على اليمين
+          .setImage(lineGifUrl) // الخط المتحرك كفاصل في الأسفل
+          .setColor('#2b2d31');
 
-        const row = new ActionRowBuilder().addComponents(
+        // أزرار التصويت
+        const buttons = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId('suggestion_upvote')
+            .setCustomId('suggest_up')
             .setLabel('0')
             .setStyle(ButtonStyle.Secondary)
-            .setEmoji({ id: '1556268829879836793' }),
+            .setEmoji('👍'),
           new ButtonBuilder()
-            .setCustomId('suggestion_downvote')
+            .setCustomId('suggest_down')
             .setLabel('0')
             .setStyle(ButtonStyle.Secondary)
-            .setEmoji({ id: '1556268829879836793' })
+            .setEmoji('👎')
         );
 
+        // إرسال الاقتراح في الروم
         const sentMessage = await message.channel.send({
-          embeds: [embed],
-          components: [row]
+          embeds: [suggestEmbed],
+          components: [buttons]
+        }).catch((err) => {
+          logger.error('Failed to send suggestion embed:', err);
         });
 
-        await sentMessage.startThread({
-          name: `Discussion - ${message.author.username}`,
-          autoArchiveDuration: 1440
-        });
+        if (sentMessage) {
+          // فتح ثريد المناقشة
+          await sentMessage.startThread({
+            name: `Discussion - ${message.author.username}`,
+            autoArchiveDuration: 1440,
+          }).catch((err) => {
+            logger.error('Failed to create suggestion thread:', err);
+          });
+        }
 
-      } catch (error) {
-        console.error('حدث خطأ أثناء معالجة الاقتراح:', error);
+        return;
       }
-      return;
+
+      // 2. نظام تغيير اسم التكت تلقائياً
+      await handleTicketAutoRename(message);
+
+    } catch (error) {
+      logger.error('Error in messageCreate event:', error);
     }
-
-    // باقي الأوامر الإدارية...
-    if (processedMessages.has(message.id)) return;
-    processedMessages.add(message.id);
-    setTimeout(() => processedMessages.delete(message.id), 5000);
-
-    const content = message.content.trim();
-    const args = content.split(/\s+/);
-    const command = args[0].toLowerCase();
-
-    if (command === 'ip') {
-      await message.reply('144.217.62.159:7777').catch(() => {});
-      return;
-    } else if (command === 'fayt') {
-      await message.reply('pr.sampdroid.app:7777').catch(() => {});
-      return;
-    }
-
-    const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
-    if (!hasAllowedRole) return;
-
-    if (command === 'رابط') {
-      await message.reply('𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq').catch(() => {});
-      return;
-    } else if (command === 'خط') {
-      await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&').catch(() => {});
-      return;
-    }
-  }
+  },
 };
+
+async function handleTicketAutoRename(message) {
+  try {
+    const channel = message.channel;
+
+    if (!channel.name.toLowerCase().startsWith('ticket-')) return;
+
+    const parts = channel.name.split('-');
+    if (parts.length > 2) return; 
+
+    const firstWord = message.content.trim().split(/\s+/)[0];
+    if (!firstWord) return;
+
+    const cleanWord = firstWord.replace(/[^\w\u0600-\u06FF-]/g, '');
+
+    if (cleanWord.length > 0) {
+      const ticketNumberMatch = channel.name.match(/\d+/);
+      const ticketNumber = ticketNumberMatch ? ticketNumberMatch[0] : '0000';
+      const newName = `${ticketNumber}-${cleanWord}`;
+
+      await channel.send({
+        content: `**مرحباً بك، سيتم تغيير اسم التكت بناءً على رسالتك لتسهيل الدعم الفني. شكراً لك!🤍**`
+      }).catch(() => {});
+
+      await channel.setName(newName);
+      logger.info(`Ticket renamed successfully to ${newName}`);
+    }
+  } catch (error) {
+    logger.error('Error handling ticket rename:', error);
+  }
+}
