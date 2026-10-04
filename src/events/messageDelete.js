@@ -54,7 +54,7 @@ export default {
         return;
       }
 
-      // 2. نظام الآراء (Feedback) بتصميم إمبد فخم ومطور
+      // 2. نظام الآراء (Feedback) بتصميم جميل ونظيف بدون إيموجيات معقدة
       if (message.channel.id === FEEDBACK_CHANNEL_ID) {
         const feedbackText = message.content;
         const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
@@ -67,9 +67,9 @@ export default {
         // حذف رسالة العضو الأصلية
         await message.delete().catch(() => {});
 
-        // تصميم إمبد فخم ومرتب جداً
+        // تصميم إمبد أنيق باللون الأحمر وبدون أي إيموجيات خارجية قد تعطل البوت
         const feedbackEmbed = new EmbedBuilder()
-          .setColor('#ff334b') // لون أحمر فخم
+          .setColor('#ff334b')
           .setAuthor({
             name: `ملاحظات المستخدم: ${message.author.username}`,
             iconURL: message.author.displayAvatarURL({ dynamic: true })
@@ -77,7 +77,7 @@ export default {
           .setDescription(feedbackText ? `> ${feedbackText}` : '*(مرفق صورة بدون نص)*')
           .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
           .setFooter({ 
-            text: `المستخدم: ${message.author.tag}`, 
+            text: `بواسطة: ${message.author.tag}`, 
             iconURL: message.author.displayAvatarURL({ dynamic: true }) 
           })
           .setTimestamp();
@@ -86,19 +86,13 @@ export default {
           feedbackEmbed.setImage(attachedImage);
         }
 
-        // إرسال الإيموجيات المخصصة فوق الـ Embed كشكل جمالي
-        const sentFeedback = await message.channel.send({
-          content: `<:emoji_1:1556300724340523091> <:emoji_2:1556300789125873677> **• تقييم جديد:**`,
+        // إرسال الإمبد مباشرة بدون أي نصوص أو إيموجيات معقدة خارجه
+        await message.channel.send({
           embeds: [feedbackEmbed]
         }).catch((err) => {
           logger.error('Failed to send feedback embed:', err);
         });
 
-        if (sentFeedback) {
-          // إضافة التفاعلات تحت الرسالة تلقائياً
-          await sentFeedback.react('1556300724340523091').catch(() => {});
-          await sentFeedback.react('1556300789125873677').catch(() => {});
-        }
         return;
       }
 
