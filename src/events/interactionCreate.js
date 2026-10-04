@@ -352,6 +352,20 @@ export default {
 
           try {
             await button.execute(interaction, client, args);
+
+            // -------------------------------------------------------------
+            // ميزة تغيير اسم التكت تلقائياً عند ضغط زر فتح التكت
+            // -------------------------------------------------------------
+            if (customId.includes('ticket') || customId.includes('create_ticket')) {
+              setTimeout(async () => {
+                if (interaction.channel && interaction.channel.name.includes('ticket')) {
+                  await interaction.channel.setName(`تكت-${interaction.user.username}`).catch(err => {
+                    logger.warn('Could not rename ticket channel:', err.message);
+                  });
+                }
+              }, 1500);
+            }
+
           } catch (error) {
             await handleInteractionError(interaction, error, withTraceContext({
               type: 'button',
@@ -417,7 +431,6 @@ export default {
 
           if (!modal) {
             if (!interaction.customId.includes(':')) {
-
               return;
             }
 
@@ -468,4 +481,4 @@ export default {
       }
     });
   }
-};
+};ر
