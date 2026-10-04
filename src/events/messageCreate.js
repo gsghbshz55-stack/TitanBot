@@ -4,10 +4,11 @@ import { Events } from 'discord.js';
 const processedMessages = new Set();
 
 // ==========================================
-// آيديهات الرولات المسموح لها لرابط وخط وتفضل
+// آيديهات الرولات المسموح لها بالأوامر والردود
 // ==========================================
 const ALLOWED_ROLES = [
-  '1391735874924052560', // الآيدي الخاص بك
+  '1391735874924052560', // الرول الأولى
+  '1414751141706731691', // الرول الجديدة
 ];
 
 export default {
@@ -25,37 +26,114 @@ export default {
       processedMessages.delete(message.id);
     }, 5000);
 
-    const content = message.content.trim().toLowerCase();
+    const content = message.content.trim();
+    const args = content.split(/\s+/);
+    const command = args[0].toLowerCase();
 
     // ==========================================
     // 1. الردود العامة (للجميع بدون استثناء)
     // ==========================================
-    if (content === 'ip') {
+    if (command === 'ip') {
       await message.reply('144.217.62.159:7777').catch(() => {});
       return;
-    } else if (content === 'fayt') {
+    } else if (command === 'fayt') {
       await message.reply('pr.sampdroid.app:7777').catch(() => {});
       return;
     }
 
     // ==========================================
-    // 2. الردود المخصصة للرولات فقط (رابط / خط / تفضل)
+    // التحقق من وجود إحدى الرولات المسموحة لباقي الأوامر
     // ==========================================
-    if (content === 'رابط' || content === 'خط' || content === 'تفضل') {
-      // التحقق مما إذا كان الشخص يملك الرول المسموح
-      const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
+    const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
+    if (!hasAllowedRole) return;
 
-      // إذا لم يكن يملك الرول المطلوبة، لن يرد البوت
-      if (!hasAllowedRole) return;
+    // ==========================================
+    // 2. الردود التلقائية المخصصة
+    // ==========================================
+    if (command === 'رابط') {
+      await message.reply('𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq').catch(() => {});
+      return;
+    } else if (command === 'خط') {
+      await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&').catch(() => {});
+      return;
+    } else if (command === 'تفضل') {
+      const welcomeText = `> **السلام عليڪم**\n> **هـنـا طـاقـم عمـل**\n\n> **معـڪ الـعضو <@${message.author.id}> ڪيف يمكـنـني خدمتك :**\nhttps://cdn.discordapp.com/attachments/1399176418415607870/1468651951339339796/1339174610775703626.gif?ex=6984cc37&is=69837ab7&hm=72ae6401246f68cb693b3517d083d6d3ffcfc00ff35d561f5c7628cf48469052&`;
+      await message.reply(welcomeText).catch(() => {});
+      return;
+    }
 
-      if (content === 'رابط') {
-        await message.reply('𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq').catch(() => {});
-      } else if (content === 'خط') {
-        await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&').catch(() => {});
-      } else if (content === 'تفضل') {
-        const welcomeText = `> **السلام عليڪم**\n> **هـنـا طـاقـم عمـل**\n\n> **معـڪ الـعضو <@${message.author.id}> ڪيف يمكـنـني خدمتك :**\nhttps://cdn.discordapp.com/attachments/1399176418415607870/1468651951339339796/1339174610775703626.gif?ex=6984cc37&is=69837ab7&hm=72ae6401246f68cb693b3517d083d6d3ffcfc00ff35d561f5c7628cf48469052&`;
-        await message.reply(welcomeText).catch(() => {});
+    // ==========================================
+    // 3. الأوامر الإدارية المختصرة
+    // ==========================================
+
+    // أ) امر السحب (ايا @user)
+    if (command === 'ايا') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `ايا @user`).').catch(() => {});
+
+      const voiceChannel = message.member.voice.channel;
+      if (!voiceChannel) return message.reply('❌ يجب أن تكون داخل روم صوتي لسحبه إليك.').catch(() => {});
+      if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
+
+      await targetMember.voice.setChannel(voiceChannel).catch(() => {});
+      await message.reply(`📥 تم سحب ${targetMember.user.tag} إلى رومك.`).catch(() => {});
+      return;
+    }
+
+    // ب) امر الطرد من الصوت (قود @user)
+    if (command === 'قود') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `قود @user`).').catch(() => {});
+      if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
+
+      await targetMember.voice.disconnect().catch(() => {});
+      await message.reply(`🚪 تم طرد ${targetMember.user.tag} من الروم الصوتي.`).catch(() => {});
+      return;
+    }
+
+    // ج) امر الميوت الصوتي (اسكت @user)
+    if (command === 'اسكت') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `اسكت @user`).').catch(() => {});
+      if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
+
+      const isMuted = targetMember.voice.serverMute;
+      await targetMember.voice.setMute(!isMuted).catch(() => {});
+
+      if (!isMuted) {
+        await message.reply(`🔇 تم إعطاء ميوت صوتي لـ ${targetMember.user.tag}`).catch(() => {});
+      } else {
+        await message.reply(`🔊 تم فك الميوت الصوتي عن ${targetMember.user.tag}`).catch(() => {});
       }
+      return;
+    }
+
+    // د) امر التايم أوت (تايم @user 10m)
+    if (command === 'تايم') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص وكتابة المدة (مثال: `تايم @user 10m`).').catch(() => {});
+      if (!targetMember.moderatable) return message.reply('❌ لا يمكنني إعطاء تايم أوت لهذا الشخص.').catch(() => {});
+
+      const durationArg = args[2]?.toLowerCase();
+      if (!durationArg) return message.reply('❌ يرجى تحديد المدة مثل: `10m` (دقائق) أو `1h` (ساعات).').catch(() => {});
+
+      let ms = 0;
+      if (durationArg.endsWith('m')) {
+        ms = parseInt(durationArg) * 60 * 1000;
+      } else if (durationArg.endsWith('h')) {
+        ms = parseInt(durationArg) * 60 * 60 * 1000;
+      } else if (durationArg.endsWith('d')) {
+        ms = parseInt(durationArg) * 24 * 60 * 60 * 1000;
+      } else {
+        ms = parseInt(durationArg) * 60 * 1000;
+      }
+
+      if (isNaN(ms) || ms <= 0) return message.reply('❌ صياغة المدة غير صحيحة.').catch(() => {});
+
+      const reason = args.slice(3).join(' ') || 'بدون سبب';
+      await targetMember.timeout(ms, reason).catch(() => {});
+      await message.reply(`⏰ تم إعطاء تايم أوت لـ ${targetMember.user.tag} لمدة **${durationArg}**`).catch(() => {});
+      return;
     }
   }
 };
