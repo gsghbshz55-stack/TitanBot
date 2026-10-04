@@ -1,15 +1,35 @@
+import { Events } from 'discord.js';
+import { logger } from '../utils/logger.js';
+
+export default {
+  name: Events.MessageCreate,
+  async execute(message, client) {
+    try {
+      // تجاهل رسائل البوتات أو الرسائل التي خارج السيرفرات
+      if (message.author.bot || !message.guild) return;
+
+      // تشغيل ميزة تغيير اسم التكت تلقائياً والرسالة الترحيبية
+      await handleTicketAutoRename(message);
+
+      // (يمكنك وضع باقي أوامر البوت هنا لاحقاً)
+
+    } catch (error) {
+      logger.error('Error in messageCreate event:', error);
+    }
+  },
+};
+
+// دالة تغيير اسم التكت التلقائية والترحيب
 async function handleTicketAutoRename(message) {
   try {
     const channel = message.channel;
 
-    // 1. التحقق من أن القناة عبارة عن تكت (تبدأ بـ ticket-)
+    // 1. التحقق من أن القناة تبدأ بـ ticket-
     if (!channel.name.toLowerCase().startsWith('ticket-')) return;
 
-    // 2. إذا كان اسم القناة يحتوي على شرطة ورقم وثم كلمة أخرى (يعني تم تغيير اسمه مسبقاً)، فلا تكرر العملية
-    // شكل الاسم الافتراضي للتكت عادة يكون: ticket-0001 أو ticket-123
-    // فإذا كان الاسم يحتوي على أكثر من شرطة أو كلمة مخصصة، نتوقف
+    // 2. إذا تم تغيير اسم التكت من قبل، نتوقف
     const parts = channel.name.split('-');
-    if (parts.length > 2) return; // تم تغيير اسمه من قبل
+    if (parts.length > 2) return; 
 
     // 3. أخذ أول كلمة كتبها العضو
     const firstWord = message.content.trim().split(/\s+/)[0];
@@ -19,7 +39,7 @@ async function handleTicketAutoRename(message) {
     const cleanWord = firstWord.replace(/[^\w\u0600-\u06FF-]/g, '');
 
     if (cleanWord.length > 0) {
-      // استخراج رقم التكت من الاسم الحالي (مثال: ticket-0897 -> 0897)
+      // استخراج رقم التكت من الاسم الحالي
       const ticketNumberMatch = channel.name.match(/\d+/);
       const ticketNumber = ticketNumberMatch ? ticketNumberMatch[0] : '0000';
 
