@@ -54,7 +54,7 @@ export default {
         return;
       }
 
-      // 2. نظام الآراء (Feedback) بتصميم جميل ونظيف بدون إيموجيات معقدة
+      // 2. نظام الآراء (Feedback)
       if (message.channel.id === FEEDBACK_CHANNEL_ID) {
         const feedbackText = message.content;
         const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
@@ -64,10 +64,8 @@ export default {
         processedMessages.add(message.id);
         setTimeout(() => processedMessages.delete(message.id), 60000);
 
-        // حذف رسالة العضو الأصلية
         await message.delete().catch(() => {});
 
-        // تصميم إمبد أنيق باللون الأحمر وبدون أي إيموجيات خارجية قد تعطل البوت
         const feedbackEmbed = new EmbedBuilder()
           .setColor('#ff334b')
           .setAuthor({
@@ -86,7 +84,6 @@ export default {
           feedbackEmbed.setImage(attachedImage);
         }
 
-        // إرسال الإمبد مباشرة بدون أي نصوص أو إيموجيات معقدة خارجه
         await message.channel.send({
           embeds: [feedbackEmbed]
         }).catch((err) => {
