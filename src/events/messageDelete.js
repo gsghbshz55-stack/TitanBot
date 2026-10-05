@@ -2,7 +2,7 @@ import { Events, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
 
 // آيدي روم الاقتراحات
-const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
+const SUGGESTIONS_CHANNEL_ID = '';
 
 // آيدي روم الآراء (Feedback)
 const FEEDBACK_CHANNEL_ID = '1391737804781916160';
