@@ -1,471 +1,204 @@
-import { Events, MessageFlags } from 'discord.js';
-import { logger } from '../utils/logger.js';
-import { getGuildConfig } from '../services/config/guildConfig.js';
-import {
-  getBotMessage,
-  isBotOwner,
-  isCommandCategoryEnabled,
-  isMaintenanceMode,
-} from '../config/bot.js';
-import botConfig from '../config/bot.js';
-import { handleApplicationModal } from '../commands/Community/apply.js';
-import { handleInteractionError, createError, ErrorTypes, ErrorCodes } from '../utils/errorHandler.js';
-import { InteractionHelper } from '../utils/interactionHelper.js';
-import { createInteractionTraceContext, runWithTraceContext } from '../utils/logger.js';
-import { validateChatInputPayloadOrThrow } from '../utils/commandInputValidation.js';
-import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
-import { isCommandEnabled } from '../services/commandAccessService.js';
-import { resolveSlashAccessKey } from '../utils/messageAdapter.js';
-import { isCollectorManagedComponent } from '../utils/collectorComponents.js';
-import { ResponseCoordinator } from '../utils/responseCoordinator.js';
-import { enforceDefaultCommandPermissions } from '../utils/permissionGuard.js';
+import { Events } from 'discord.js';
 
-const COMMAND_ERROR_SUBTYPES = {
-  warn: 'warn_failed',
-  kick: 'kick_failed',
-  ban: 'ban_failed',
-  unban: 'unban_failed',
-  timeout: 'timeout_failed',
-  untimeout: 'untimeout_failed',
-  warnings: 'warnings_view_failed',
-  ticket: 'ticket_failed',
-  serverstats: 'serverstats_failed',
-  gcreate: 'giveaway_failed',
-  gend: 'giveaway_failed',
-  gdelete: 'giveaway_failed',
-  greroll: 'giveaway_failed',
-};
+// منع معالجة الرسائل المكررة
+const processedMessages = new Set();
 
-function withTraceContext(context = {}, traceContext = {}) {
-  return {
-    traceId: traceContext.traceId,
-    guildId: context.guildId || traceContext.guildId,
-    userId: context.userId || traceContext.userId,
-    command: context.commandName || traceContext.command,
-    ...context
-  };
-}
+// ==========================================
+// الرول الوحيدة المسموح لها بالأوامر (1414751141706731691)
+// ==========================================
+const ALLOWED_ROLES = [
+  '1414751141706731691',
+];
 
 export default {
-  name: Events.InteractionCreate,
-  async execute(interaction, client) {
-    const interactionTraceContext = createInteractionTraceContext(interaction);
-    interaction.traceContext = interactionTraceContext;
-    interaction.traceId = interactionTraceContext.traceId;
+  name: Events.MessageCreate,
+  async execute(message) {
+    // تجاهل البوتات والرسائل الخاصة
+    if (message.author.bot || !message.guild) return;
 
-    return runWithTraceContext(interactionTraceContext, async () => {
-      try {
-        InteractionHelper.patchInteractionResponses(interaction);
-        ResponseCoordinator.attach(interaction);
+    // التأكد من عدم تكرار الرد لنفس الرسالة
+    if (processedMessages.has(message.id)) return;
+    processedMessages.add(message.id);
 
-        if (interaction.isChatInputCommand()) {
-          try {
-            logger.info(`Command executed: /${interaction.commandName} by ${interaction.user.tag}`, {
-              event: 'interaction.command.received',
-              traceId: interactionTraceContext.traceId,
-              guildId: interaction.guildId,
-              userId: interaction.user?.id,
-              command: interaction.commandName
-            });
+    // تنظيف الذاكرة بعد 5 ثوانٍ
+    setTimeout(() => {
+      processedMessages.delete(message.id);
+    }, 5000);
 
-            validateChatInputPayloadOrThrow(interaction, withTraceContext({
-              type: 'command_input_validation',
-              commandName: interaction.commandName
-            }, interactionTraceContext));
+    const content = message.content.trim();
+    const args = content.split(/\s+/);
+    const command = args[0].toLowerCase();
 
-            const command = client.commands.get(interaction.commandName);
+    // ==========================================
+    // 1. الردود العامة (للجميع بدون استثناء)
+    // ==========================================
+    if (command === 'ip') {
+      await message.reply('144.217.62.159:7777').catch(() => {});
+      return;
+    } else if (command === 'fayt') {
+      await message.reply('pr.sampdroid.app:7777').catch(() => {});
+      return;
+    }
 
-            if (!command) {
-              throw createError(
-                `No command matching ${interaction.commandName} was found.`,
-                ErrorTypes.CONFIGURATION,
-                'Sorry, that command does not exist.',
-                withTraceContext({ commandName: interaction.commandName }, interactionTraceContext)
-              );
-            }
+    // ==========================================
+    // التحقق من وجود الرول المحددة لباقي الأوامر
+    // ==========================================
+    const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
+    if (!hasAllowedRole) return;
 
-            if (isMaintenanceMode() && !isBotOwner(interaction.user.id)) {
-              throw createError(
-                'Bot is in maintenance mode',
-                ErrorTypes.CONFIGURATION,
-                getBotMessage('maintenanceMode'),
-                withTraceContext({ commandName: interaction.commandName }, interactionTraceContext)
-              );
-            }
+    // ==========================================
+    // 2. الردود التلقائية المخصصة
+    // ==========================================
+    if (command === 'رابط') {
+      await message.reply('𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq').catch(() => {});
+      return;
+    } else if (command === 'خط') {
+      await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&').catch(() => {});
+      return;
+    } else if (command === 'تفضل') {
+      const welcomeText = `> **السلام عليڪم**\n> **هـنـا طـاقـم عمـل**\n\n> **معـڪ الـعضو <@${message.author.id}> ڪيف يمكـنـني خدمتك :**\nhttps://cdn.discordapp.com/attachments/1399176418415607870/1468651951339339796/1339174610775703626.gif?ex=6984cc37&is=69837ab7&hm=72ae6401246f68cb693b3517d083d6d3ffcfc00ff35d561f5c7628cf48469052&`;
+      await message.reply(welcomeText).catch(() => {});
+      return;
+    }
 
-            if (!isCommandCategoryEnabled(command.category)) {
-              throw createError(
-                `Feature disabled for category ${command.category}`,
-                ErrorTypes.CONFIGURATION,
-                getBotMessage('commandDisabled'),
-                withTraceContext({ commandName: interaction.commandName, category: command.category }, interactionTraceContext)
-              );
-            }
+    // ==========================================
+    // 3. الأوامر الإدارية والصوتية المختصرة
+    // ==========================================
 
-            const defaultCooldownSec = Number(botConfig.commands?.defaultCooldown) || 0;
-            if (defaultCooldownSec > 0 && !isBotOwner(interaction.user.id)) {
-              const cooldownKey = `${interaction.user.id}:${interaction.commandName}`;
-              const expiresAt = client.cooldowns.get(cooldownKey);
+    // أ) امر دخول الفويس (join)
+    if (command === 'join') {
+      try {
+        const targetVoiceChannelId = '1415546159417655346';
+        const guild = message.guild;
+        const channel = await guild.channels.fetch(targetVoiceChannelId).catch(() => null);
 
-              if (expiresAt && Date.now() < expiresAt) {
-                const remainingSec = Math.ceil((expiresAt - Date.now()) / 1000);
-                throw createError(
-                  `Default command cooldown active for ${interaction.commandName}`,
-                  ErrorTypes.RATE_LIMIT,
-                  getBotMessage('cooldownActive', { time: `${remainingSec}s` }),
-                  withTraceContext({ commandName: interaction.commandName, remainingSec }, interactionTraceContext)
-                );
-              }
+        if (!channel) {
+          return message.reply('❌ لم يتم العثور على الروم الصوتي المحدد!').catch(() => {});
+        }
 
-              client.cooldowns.set(cooldownKey, Date.now() + defaultCooldownSec * 1000);
-            }
+        const { joinVoiceChannel, VoiceConnectionStatus, entersState } = await import('@discordjs/voice');
+        
+        const connection = joinVoiceChannel({
+          channelId: channel.id,
+          guildId: guild.id,
+          adapterCreator: guild.voiceAdapterCreator,
+          selfDeaf: true,
+          selfMute: true
+        });
 
-            const abuseProtection = await enforceAbuseProtection(interaction, command, interaction.commandName);
-            if (!abuseProtection.allowed) {
-              const formattedCooldown = formatCooldownDuration(abuseProtection.remainingMs);
-              throw createError(
-                `Risky command cooldown active for ${interaction.commandName}`,
-                ErrorTypes.RATE_LIMIT,
-                `This command is on cooldown. Please wait ${formattedCooldown} before trying again.`,
-                withTraceContext({
-                  commandName: interaction.commandName,
-                  subtype: 'command_cooldown',
-                  expected: true,
-                  cooldownMs: abuseProtection.remainingMs,
-                  cooldownWindowMs: abuseProtection.policy?.windowMs,
-                  cooldownMaxAttempts: abuseProtection.policy?.maxAttempts
-                }, interactionTraceContext)
-              );
-            }
+        connection.on(VoiceConnectionStatus.Disconnected, async () => {
+          try {
+            await entersState(connection, VoiceConnectionStatus.Connecting, 5_000);
+          } catch {
+            connection.destroy();
+          }
+        });
 
-            let guildConfig = null;
-            if (interaction.guild) {
-              guildConfig = await getGuildConfig(client, interaction.guild.id, interactionTraceContext);
-              const accessKey = resolveSlashAccessKey(interaction);
-              if (!(await isCommandEnabled(client, interaction.guild.id, accessKey, command.category))) {
-                throw createError(
-                  `Command ${accessKey} is disabled in this guild`,
-                  ErrorTypes.CONFIGURATION,
-                  'This command has been disabled for this server.',
-                  withTraceContext({ commandName: accessKey, guildId: interaction.guild.id }, interactionTraceContext)
-                );
-              }
-            }
+        await message.reply(`✅ تم بنجاح! البوت الآن متواجد في روم: **${channel.name}**`).catch(() => {});
+      } catch (err) {
+        console.error(err);
+        await message.reply('❌ حدث خطأ أثناء محاولة دخول البوت للفويس.').catch(() => {});
+      }
+      return;
+    }
 
-            const permissionAllowed = await enforceDefaultCommandPermissions(interaction, command, {
-              source: 'interactionCreate',
-              guildConfig,
-            });
-            if (!permissionAllowed) {
-              return;
-            }
+    // ب) امر المسح (مسح 9)
+    if (command === 'مسح') {
+      const amount = parseInt(args[1]);
+      if (isNaN(amount) || amount < 1 || amount > 100) {
+        return message.reply('❌ يرجى كتابة عدد صحيح من 1 إلى 100 (مثال: `مسح 9`).').catch(() => {});
+      }
 
-            await command.execute(interaction, guildConfig, client);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'command',
-              commandName: interaction.commandName,
-              subtype: COMMAND_ERROR_SUBTYPES[interaction.commandName] || error?.context?.subtype,
-            }, interactionTraceContext));
-          }
-        } else if (interaction.isAutocomplete()) {
-          const autocompleteCommand = client.commands.get(interaction.commandName);
-          if (autocompleteCommand?.autocomplete) {
-            try {
-              await autocompleteCommand.autocomplete(interaction, client);
-            } catch (error) {
-              logger.error('Error handling command autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName,
-              });
-              await interaction.respond([]).catch(() => {});
-            }
-            return;
-          }
+      await message.delete().catch(() => {});
+      const deleted = await message.channel.bulkDelete(amount, true).catch(() => null);
+      
+      if (deleted) {
+        const msg = await message.channel.send(`✅ تم مسح **${deleted.size}** رسالة.`).catch(() => {});
+        setTimeout(() => msg?.delete().catch(() => {}), 3000);
+      }
+      return;
+    }
 
-          const focusedOption = interaction.options.getFocused(true);
-          
-          if (interaction.commandName === 'apply' && focusedOption.name === 'application') {
-            try {
-              const { getApplicationRoles } = await import('../utils/database.js');
-              const roles = await getApplicationRoles(client, interaction.guildId);
-              const roleName = interaction.options.getString('application', false);
+    // ج) امر الحظر (تف @user السبب)
+    if (command === 'تف') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص المراد حظره (مثال: `تف @user`).').catch(() => {});
+      if (!targetMember.bannable) return message.reply('❌ لا يمكنني حظر هذا الشخص.').catch(() => {});
 
-              const filtered = roles.filter(role =>
-                role.enabled !== false && 
-                role.name.toLowerCase().startsWith(roleName?.toLowerCase() || '')
-              );
-              
-              await interaction.respond(
-                filtered.slice(0, 25).map(role => ({
-                  name: `${role.name}${role.enabled === false ? ' (disabled)' : ''}`,
-                  value: role.name
-                }))
-              );
-            } catch (error) {
-              logger.error('Error handling autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName
-              });
-              await interaction.respond([]);
-            }
-          } else if (interaction.commandName === 'app-admin' && focusedOption.name === 'application') {
-            try {
-              const { getApplicationRoles } = await import('../utils/database.js');
-              const roles = await getApplicationRoles(client, interaction.guildId);
-              const appName = interaction.options.getString('application', false);
+      const reason = args.slice(2).join(' ') || 'بدون سبب';
+      await targetMember.ban({ reason }).catch(() => {});
+      await message.reply(`🔨 تم حظر ${targetMember.user.tag} بنجاح.`).catch(() => {});
+      return;
+    }
 
-              const filtered = roles.filter(role =>
-                role.name.toLowerCase().startsWith(appName?.toLowerCase() || '')
-              );
-              
-              await interaction.respond(
-                filtered.slice(0, 25).map(role => ({
-                  name: `${role.name}${role.enabled === false ? ' (disabled)' : ''}`,
-                  value: role.name
-                }))
-              );
-            } catch (error) {
-              logger.error('Error handling app-admin autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName
-              });
-              await interaction.respond([]);
-            }
-          } else if (interaction.commandName === 'reactroles' && focusedOption.name === 'panel') {
-            try {
-              const { getAllReactionRoleMessages, deleteReactionRoleMessage } = await import('../services/reactionRoleService.js');
-              const guildId = interaction.guildId;
-              const guild = interaction.guild;
-              
-              let panels = await getAllReactionRoleMessages(client, guildId);
-              
-              if (!panels || panels.length === 0) {
-                await interaction.respond([]);
-                return;
-              }
+    // د) امر السحب (ايا @user)
+    if (command === 'ايا') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `ايا @user`).').catch(() => {});
 
-              const validPanels = [];
-              for (const panel of panels) {
-                if (!panel.messageId || !panel.channelId) {
-                  continue;
-                }
-                
-                const channel = guild.channels.cache.get(panel.channelId);
-                if (!channel) {
-                  await deleteReactionRoleMessage(client, guildId, panel.messageId).catch(() => {});
-                  continue;
-                }
-                
-                const msg = await channel.messages.fetch(panel.messageId).catch(() => null);
-                if (!msg) {
-                  await deleteReactionRoleMessage(client, guildId, panel.messageId).catch(() => {});
-                  continue;
-                }
-                validPanels.push(panel);
-              }
-              
-              if (validPanels.length === 0) {
-                await interaction.respond([]);
-                return;
-              }
-              
-              const choices = await Promise.all(
-                validPanels.slice(0, 25).map(async panel => {
-                  try {
-                    const channel = guild.channels.cache.get(panel.channelId);
-                    if (!channel) return null;
-                    
-                    const msg = await channel.messages.fetch(panel.messageId).catch(() => null);
-                    if (!msg) return null;
-                    
-                    const title = msg?.embeds?.[0]?.title ?? 'Untitled Panel';
-                    const channelName = channel?.name ?? 'unknown';
-                    
-                    return {
-                      name: `${title} (${channelName})`.substring(0, 100),
-                      value: panel.messageId
-                    };
-                  } catch (e) {
-                    return null;
-                  }
-                })
-              );
-              
-              const validChoices = choices.filter(c => c !== null);
-              await interaction.respond(validChoices);
-            } catch (error) {
-              logger.error('Error handling reactroles autocomplete:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                commandName: interaction.commandName
-              });
-              await interaction.respond([]);
-            }
-          }
-        } else if (interaction.isButton()) {
-          if (interaction.customId.startsWith('shared_todo_')) {
-            const parts = interaction.customId.split('_');
-            const buttonType = parts.slice(0, 3).join('_');
-            const listId = parts[3];
-            const button = client.buttons.get(buttonType);
+      const voiceChannel = message.member.voice.channel;
+      if (!voiceChannel) return message.reply('❌ يجب أن تكون داخل روم صوتي لسحبه إليك.').catch(() => {});
+      if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
 
-            if (button) {
-              try {
-                await button.execute(interaction, client, [listId]);
-              } catch (error) {
-                await handleInteractionError(interaction, error, withTraceContext({
-                  type: 'button',
-                  customId: interaction.customId,
-                  handler: 'todo'
-                }, interactionTraceContext));
-              }
-            } else {
-              throw createError(
-                `No button handler found for ${buttonType}`,
-                ErrorTypes.CONFIGURATION,
-                'This button is not available.',
-                withTraceContext({ buttonType }, interactionTraceContext)
-              );
-            }
-            return;
-          }
+      await targetMember.voice.setChannel(voiceChannel).catch(() => {});
+      await message.reply(`📥 تم سحب ${targetMember.user.tag} إلى رومك.`).catch(() => {});
+      return;
+    }
 
-          const [customId, ...args] = interaction.customId.split(':');
-          const button = client.buttons.get(customId);
+    // هـ) امر الطرد من الصوت (قود @user)
+    if (command === 'قود') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `قود @user`).').catch(() => {});
+      if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
 
-          if (!button) {
-            if (!interaction.customId.includes(':') || isCollectorManagedComponent(customId)) {
-              return;
-            }
+      await targetMember.voice.disconnect().catch(() => {});
+      await message.reply(`🚪 تم طرد ${targetMember.user.tag} من الروم الصوتي.`).catch(() => {});
+      return;
+    }
 
-            throw createError(
-              `No button handler found for ${customId}`,
-              ErrorTypes.CONFIGURATION,
-              'This button is not available.',
-              withTraceContext({ customId }, interactionTraceContext)
-            );
-          }
+    // و) امر الميوت الصوتي (اسكت @user)
+    if (command === 'اسكت') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `اسكت @user`).').catch(() => {});
+      if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
 
-          try {
-            await button.execute(interaction, client, args);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'button',
-              customId: interaction.customId,
-              handler: 'general'
-            }, interactionTraceContext));
-          }
-        } else if (interaction.isStringSelectMenu()) {
-          const [customId, ...args] = interaction.customId.split(':');
-          const selectMenu = client.selectMenus.get(customId);
+      const isMuted = targetMember.voice.serverMute;
+      await targetMember.voice.setMute(!isMuted).catch(() => {});
 
-          if (!selectMenu) {
-            if (!interaction.customId.includes(':') || isCollectorManagedComponent(customId)) {
-              return;
-            }
+      if (!isMuted) {
+        await message.reply(`🔇 تم إعطاء ميوت صوتي لـ ${targetMember.user.tag}`).catch(() => {});
+      } else {
+        await message.reply(`🔊 تم فك الميوت الصوتي عن ${targetMember.user.tag}`).catch(() => {});
+      }
+      return;
+    }
 
-            throw createError(
-              `No select menu handler found for ${customId}`,
-              ErrorTypes.CONFIGURATION,
-              'This select menu is not available.',
-              withTraceContext({ customId }, interactionTraceContext)
-            );
-          }
+    // ز) امر التايم أوت (تايم @user 10m)
+    if (command === 'تايم') {
+      const targetMember = message.mentions.members.first();
+      if (!targetMember) return message.reply('❌ يرجى منشن الشخص وكتابة المدة (مثال: `تايم @user 10m`).').catch(() => {});
+      if (!targetMember.moderatable) return message.reply('❌ لا يمكنني إعطاء تايم أوت لهذا الشخص.').catch(() => {});
 
-          try {
-            await selectMenu.execute(interaction, client, args);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'select_menu',
-              customId: interaction.customId
-            }, interactionTraceContext));
-          }
-        } else if (interaction.isModalSubmit()) {
-          if (interaction.customId.startsWith('app_modal_')) {
-            try {
-              await handleApplicationModal(interaction);
-            } catch (error) {
-              await handleInteractionError(interaction, error, withTraceContext({
-                type: 'modal',
-                customId: interaction.customId,
-                handler: 'application'
-              }, interactionTraceContext));
-            }
-            return;
-          }
+      const durationArg = args[2]?.toLowerCase();
+      if (!durationArg) return message.reply('❌ يرجى تحديد المدة مثل: `10m` (دقائق) أو `1h` (ساعات).').catch(() => {});
 
-          if (
-            interaction.customId.startsWith('app_review_')
-            || interaction.customId.startsWith('jtc_')
-            || interaction.customId.startsWith('config_wizard_modal:')
-            || interaction.customId.startsWith('log_dash_channel_modal:')
-            || interaction.customId.startsWith('log_dash_filter_modal:')
-          ) {
-            logger.debug(`Skipping modal handler lookup for inline-awaited modal: ${interaction.customId}`, {
-              event: 'interaction.modal.inline_skipped',
-              traceId: interactionTraceContext.traceId
-            });
-            return;
-          }
+      let ms = 0;
+      if (durationArg.endsWith('m')) {
+        ms = parseInt(durationArg) * 60 * 1000;
+      } else if (durationArg.endsWith('h')) {
+        ms = parseInt(durationArg) * 60 * 60 * 1000;
+      } else if (durationArg.endsWith('d')) {
+        ms = parseInt(durationArg) * 24 * 60 * 60 * 1000;
+      } else {
+        ms = parseInt(durationArg) * 60 * 1000;
+      }
 
-          const [customId, ...args] = interaction.customId.split(':');
-          const modal = client.modals.get(customId);
+      if (isNaN(ms) || ms <= 0) return message.reply('❌ صياغة المدة غير صحيحة.').catch(() => {});
 
-          if (!modal) {
-            if (!interaction.customId.includes(':')) {
-
-              return;
-            }
-
-            throw createError(
-              `No modal handler found for ${customId}`,
-              ErrorTypes.CONFIGURATION,
-              'This form is not available.',
-              withTraceContext({ customId }, interactionTraceContext)
-            );
-          }
-
-          try {
-            await modal.execute(interaction, client, args);
-          } catch (error) {
-            await handleInteractionError(interaction, error, withTraceContext({
-              type: 'modal',
-              customId: interaction.customId,
-              handler: 'general'
-            }, interactionTraceContext));
-          }
-        }
-      } catch (error) {
-        logger.error('Unhandled error in interactionCreate:', {
-          event: 'interaction.unhandled_error',
-          errorCode: ErrorCodes.INTERACTION_UNHANDLED,
-          error,
-          traceId: interactionTraceContext.traceId,
-          interactionId: interaction.id,
-          guildId: interaction.guildId,
-          userId: interaction.user?.id
-        });
-
-        try {
-          await handleInteractionError(interaction, error, withTraceContext({
-            type: 'interaction',
-            commandName: interaction.commandName,
-            customId: interaction.customId,
-            source: 'interactionCreate.unhandled'
-          }, interactionTraceContext));
-        } catch (replyError) {
-          logger.error('Failed to send fallback error response:', {
-            event: 'interaction.error_response_failed',
-            errorCode: ErrorCodes.INTERACTION_RESPONSE_FAILED,
-            error: replyError,
-            traceId: interactionTraceContext.traceId
-          });
-        }
-      }
-    });
-  }
+      const reason = args.slice(3).join(' ') || 'بدون سبب';
+      await targetMember.timeout(ms, reason).catch(() => {});
+      await message.reply(`⏰ تم إعطاء تايم أوت لـ ${targetMember.user.tag} لمدة **${durationArg}**`).catch(() => {});
+      return;
+    }
+  }
 };
