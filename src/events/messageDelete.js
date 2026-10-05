@@ -1,4 +1,5 @@
-import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+
+import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 // منع معالجة الرسائل المكررة
 const processedMessages = new Set();
@@ -13,41 +14,14 @@ const ALLOWED_ROLES = [
   '1414751141706731691',
 ];
 
-// دالة تحويل الاختصارات (1k -> 1000, 1m -> 1000000) وقراءة الأرقام
-function parseNumberInput(input) {
-  if (!input) return NaN;
-  let cleanInput = input.toString().trim().toLowerCase().replace(/,/g, '');
-  let multiplier = 1;
-
-  if (cleanInput.endsWith('k')) {
-    multiplier = 1000;
-    cleanInput = cleanInput.slice(0, -1);
-  } else if (cleanInput.endsWith('m')) {
-    multiplier = 1000000;
-    cleanInput = cleanInput.slice(0, -1);
-  } else if (cleanInput.endsWith('b')) {
-    multiplier = 1000000000;
-    cleanInput = cleanInput.slice(0, -1);
-  }
-
-  const number = parseFloat(cleanInput);
-  if (isNaN(number)) return NaN;
-  return Math.floor(number * multiplier);
-}
-
-// دالة تنسيق الأرقام بفاصلة الآلاف
-function formatNumber(num) {
-  return num.toLocaleString('en-US');
-}
+// أيدي الروم المخصص للضريبة
+const TAX_CHANNEL_ID = '1415584488401928292';
 
 export default {
   name: Events.MessageCreate,
   async execute(message) {
     // تجاهل البوتات والرسائل الخاصة
     if (message.author.bot || !message.guild) return;
-
-    // معالجة الأزرار والنوافذ التفاعلية في حال استخدامها كـ Interaction (إذا تم تفعيلها في ملف InteractionCreate منفصل، أو يمكنك دمجها هنا إذا أردت، لكن الأفضل تركها هنا أو التعامل معها)
-    // ملاحظة: الأزرار والنوافذ يتم معالجتها عادة عبر حدث interactionCreate. سنضع كود الأزرار في الأسفل ليعمل معاً بسلاسة.
 
     // التأكد من عدم تكرار الرد لنفس الرسالة
     if (processedMessages.has(message.id)) return;
@@ -74,9 +48,13 @@ export default {
     }
 
     // ==========================================
-    // أمر إرسال لوحة أزرار الضريبة (متاح للإداريين أو للجميع حسب رغبتك)
+    // أمر إرسال لوحة أزرار الضريبة (يعمل فقط في روم الضريبة المحدد)
     // ==========================================
     if (command === 'ضريبة' || command === 'taxpanel') {
+      if (message.channel.id !== TAX_CHANNEL_ID) {
+        return message.reply(`❌ هذا الأمر مخصص فقط في روم الضريبة المحدد!`).catch(() => {});
+      }
+
       const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
       if (!hasAllowedRole) return;
 
@@ -280,64 +258,6 @@ export default {
     }
   }
 };
-
-// ==========================================
-// معالجة الأزرار والنوافذ (Interaction Handler)
-// يمكنك وضع هذا في ملف interactionCreate.js أو دمج التعامل معه
-// ==========================================
-export async function handleTaxInteractions(interaction) {
-  if (interaction.isButton()) {
-    if (interaction.customId === 'open_tax_modal') {
-      const modal = new ModalBuilder()
-        .setCustomId('tax_modal')
-        .setTitle('حساب ضريبة البروبوت');
-
-      const amountInput = new TextInputBuilder()
-        .setCustomId('tax_amount_input')
-        .setLabel('أدخل المبلغ (مثال: 1000000 أو 1m أو 1k)')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      const row = new ActionRowBuilder().addComponents(amountInput);
-      modal.addComponents(row);
-
-      await interaction.showModal(modal).catch(() => {});
-    } else if (interaction.customId === 'mediator_btn') {
-      await interaction.reply({
-        content: `> **هذا هو صانع البوت / المسؤول:**\n> <@1382453552081010709>`,
-        ephemeral: true
-      }).catch(() => {});
-    }
-  } else if (interaction.isModalSubmit()) {
-    if (interaction.customId === 'tax_modal') {
-      const rawInput = interaction.fields.getTextInputValue('tax_amount_input');
-      const amount = parseNumberInput(rawInput);
-
-      if (isNaN(amount) || amount <= 0) {
-        return interaction.reply({ content: '❌ يرجى إدخال رقم صحيح (مثل `1000000` أو `1m`).', ephemeral: true }).catch(() => {});
-      }
-
-      // حساب ضريبة بروبوت (ProBot Tax Formula: x / 0.95)
-      const tax = Math.ceil(amount / 0.95);
-      // نسبة الوسيط 2%
-      const mediatorFee = Math.ceil(amount * 0.02);
-      const totalWithMediator = tax + mediatorFee;
-
-      const embed = new EmbedBuilder()
-        .setColor('#ff0055')
-        .setThumbnail(interaction.guild?.iconURL({ dynamic: true }) || null)
-        .addFields(
-          { name: '• المبلغ:', value: `\`${formatNumber(amount)}\``, inline: false },
-          { name: '• ضريبة بروبوت:', value: `\`${formatNumber(tax)}\``, inline: false },
-          { name: '• المبلغ كامل مع ضريبة الوسيط:', value: `\`${formatNumber(totalWithMediator)}\``, inline: false },
-          { name: '• نسبة الوسيط (2%):', value: `\`${formatNumber(mediatorFee)}\``, inline: false },
-          { name: '• الضريبة كاملة مع نسبة الوسيط:', value: `\`${formatNumber(totalWithMediator)}\``, inline: false }
-        );
-
-      await interaction.reply({ embeds: [embed], ephemeral: false }).catch(() => {});
-    }
-  }
-}
 
 function nameOfChannel(channel) {
   return channel.name;
