@@ -1,63 +1,168 @@
+import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { logger } from '../utils/logger.js';
 
-import { Events, EmbedBuilder } from 'discord.js';
+// آيديات الرومات
+const FEEDBACK_CHANNEL_ID = '1391737804781916160';
+const TAX_CHANNEL_ID = '1415584488401928292'; // روم الضريبة التلقائي
+
+// مجموعة لحفظ آيديات الرسائل لمنع التكرار
+const processedMessages = new Set();
 
 export default {
   name: Events.MessageCreate,
-  async execute(message) {
-    if (!message || message.author.bot || !message.guild) return;
+  async execute(message, client) {
+    try {
+      if (message.author.bot || !message.guild) return;
 
-    const content = message.content ? message.content.trim() : '';
-    const args = content.split(/\s+/);
-    const command = args[0].toLowerCase();
+      // 1. نظام الضريبة التلقائي (يدعم الأرقام العادية واختصارات مثل k, m, b)
+      if (message.channel.id === TAX_CHANNEL_ID) {
+        const cleanContent = message.content.trim().toLowerCase();
+        let amount = null;
 
-    // يمكنك اختيار الأمر الذي تفضله، هنا جعلته يعمل بكلمة 'tax' أو 'ضريبة'
-    if (command === 'tax' || command === 'ضريبة') {
-      const input = args[1];
-      if (!input) {
-        return message.reply('❌ يرجى كتابة المبلغ المراد حساب ضريبته (مثال: `tax 100k` أو `tax 1m`).').catch(() => {});
+        // التحقق مما إذا كان المدخل رقماً عادياً أو يحتوي على اختصارات (k, m, b)
+        const match = cleanContent.match(/^(\d+(?:\.\d+)?)([kmb])?$/);
+        
+        if (match) {
+          const num = parseFloat(match[1]);
+          const suffix = match[2];
+
+          if (suffix === 'k') {
+            amount = Math.floor(num * 1000);
+          } else if (suffix === 'm') {
+            amount = Math.floor(num * 1000000);
+          } else if (suffix === 'b') {
+            amount = Math.floor(num * 1000000000);
+          } else if (!suffix) {
+            amount = Math.floor(num);
+          }
+        }
+
+        if (amount !== null && amount > 0) {
+          if (processedMessages.has(message.id)) return;
+          processedMessages.add(message.id);
+          setTimeout(() => processedMessages.delete(message.id), 60000);
+
+          // حذف رسالة العضو الأصلية
+          await message.delete().catch(() => {});
+
+          // حساب الضرائب بدقة
+          const taxPro = Math.floor(amount * 20 / 19);
+          const mediatorFee = Math.floor(amount * 0.02); // نسبة الوسيط 2%
+          const totalWithAll = taxPro + mediatorFee;
+
+          const taxEmbed = new EmbedBuilder()
+            .setColor('#ff334b')
+            .setAuthor({
+              name: message.guild.name,
+              iconURL: message.guild.iconURL({ dynamic: true })
+            })
+            .setDescription(`
+• **المبلغ:** \`${amount.toLocaleString()}\`
+• **ضريبة بروبوت:** \`${taxPro.toLocaleString()}\`
+• **المبلغ كامل مع ضريبة الوسيط:** \`${(taxPro + mediatorFee).toLocaleString()}\`
+• **نسبة الوسيط (2%):** \`${mediatorFee.toLocaleString()}\`
+• **الضريبة كاملة مع نسبة الوسيط:** \`${totalWithAll.toLocaleString()}\`
+            `)
+            .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('tax_btn')
+              .setLabel('Tax')
+              .setStyle(ButtonStyle.Primary)
+              .setDisabled(true),
+            new ButtonBuilder()
+              .setCustomId('mediator_btn')
+              .setLabel('Mediator')
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(true)
+          );
+
+          await message.channel.send({
+            embeds: [taxEmbed],
+            components: [row]
+          }).catch((err) => {
+            logger.error('Failed to send tax embed:', err);
+          });
+        }
+        return;
       }
 
-      // دالة تحويل الاختصارات (مثل 6k, 1m, 500) إلى أرقام صحيحة
-      let amount = parseTaxInput(input);
-      if (isNaN(amount) || amount <= 0) {
-        return message.reply('❌ يرجى كتابة رقم صحيح أو استخدام اختصارات صحيحة (مثل: `100k`, `1.5m`, `5000`).').catch(() => {});
+      // 2. نظام الآراء (Feedback)
+      if (message.channel.id === FEEDBACK_CHANNEL_ID) {
+        const feedbackText = message.content;
+        const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
+        if (!feedbackText && !attachedImage) return;
+
+        if (processedMessages.has(message.id)) return;
+        processedMessages.add(message.id);
+        setTimeout(() => processedMessages.delete(message.id), 60000);
+
+        await message.delete().catch(() => {});
+
+        const feedbackEmbed = new EmbedBuilder()
+          .setColor('#ff334b')
+          .setAuthor({
+            name: `ملاحظات المستخدم: ${message.author.username}`,
+            iconURL: message.author.displayAvatarURL({ dynamic: true })
+          })
+          .setDescription(feedbackText ? `> ${feedbackText}` : '*(مرفق صورة بدون نص)*')
+          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+          .setFooter({ 
+            text: `بواسطة: ${message.author.tag}`, 
+            iconURL: message.author.displayAvatarURL({ dynamic: true }) 
+          })
+          .setTimestamp();
+
+        if (attachedImage) {
+          feedbackEmbed.setImage(attachedImage);
+        }
+
+        await message.channel.send({
+          embeds: [feedbackEmbed]
+        }).catch((err) => {
+          logger.error('Failed to send feedback embed:', err);
+        });
+
+        return;
       }
 
-      // حساب الضريبة (عادة ضريبة بروبوت تبلغ 5% أو الحسبة القياسية لبروبوت ProBot)
-      // المعادلة القياسية لضريبة بروبوت: المبلغ / 0.95 (أو ما يناسب حسابات الخصم)
-      // بناءً على الصورة: 100000 تصبح ضريبة البوت 105264
-      const botTax = Math.ceil(amount * 20 / 19); // المعادلة الشهيرة لضريبة بروبوت
-      const mediatorPercentage = 2; // نسبة الوسيط 2%
-      const mediatorFee = Math.ceil(amount * (mediatorPercentage / 100));
-      const totalWithMediator = amount + mediatorFee;
-      const fullTaxWithMediator = Math.ceil(totalWithMediator * 20 / 19);
+      // 3. نظام تغيير اسم التكت تلقائياً
+      await handleTicketAutoRename(message);
 
-      // تنسيق الإمبد أو النص تماماً مثل الصورة
-      const resultText = `> * المبلغ: **${formatNumber(amount)}**\n> * ضريبة بروبوت: **${formatNumber(botTax)}**\n> * المبلغ كامل مع ضريبة الوسيط: **${formatNumber(totalWithMediator)}**\n> * نسبة الوسيط %2: **${formatNumber(mediatorFee)}**\n> * الضريبة كاملة مع نسبة الوسيط: **${formatNumber(fullTaxWithMediator)}**`;
-
-      await message.reply(resultText).catch(() => {});
+    } catch (error) {
+      logger.error('Error in messageCreate event:', error);
     }
-  }
+  },
 };
 
-// دالة لمعالجة الأرقام والاختصارات الفرنسية (k, m)
-function parseTaxInput(input) {
-  let cleanInput = input.toLowerCase().replace(/,/g, '');
-  let multiplier = 1;
+async function handleTicketAutoRename(message) {
+  try {
+    const channel = message.channel;
+    if (!channel.name.toLowerCase().startsWith('ticket-')) return;
 
-  if (cleanInput.endsWith('k')) {
-    multiplier = 1000;
-    cleanInput = cleanInput.slice(0, -1);
-  } else if (cleanInput.endsWith('m')) {
-    multiplier = 1000000;
-    cleanInput = cleanInput.slice(0, -1);
+    const parts = channel.name.split('-');
+    if (parts.length > 2) return; 
+
+    const firstWord = message.content.trim().split(/\s+/)[0];
+    if (!firstWord) return;
+
+    const cleanWord = firstWord.replace(/[^\w\u0600-\u06FF-]/g, '');
+
+    if (cleanWord.length > 0) {
+      const ticketNumberMatch = channel.name.match(/\d+/);
+      const ticketNumber = ticketNumberMatch ? ticketNumberMatch[0] : '0000';
+      const newName = `${ticketNumber}-${cleanWord}`;
+
+      await channel.send({
+        content: `**مرحباً بك، سيتم تغيير اسم التكت بناءً على رسالتك لتسهيل الدعم الفني. شكراً لك!🤍**`
+      }).catch(() => {});
+
+      await channel.setName(newName);
+      logger.info(`Ticket renamed successfully to ${newName}`);
+    }
+  } catch (error) {
+    logger.error('Error handling ticket rename:', error);
   }
-
-  const number = parseFloat(cleanInput);
-  return isNaN(number) ? NaN : Math.floor(number * multiplier);
-}
-
-// دالة لتنسيق الأرقام بفواصل لتكون واضحة
-function formatNumber(num) {
-  return num.toLocaleString('en-US');
 }
