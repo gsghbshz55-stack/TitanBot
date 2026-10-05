@@ -1,10 +1,9 @@
 import { Events } from 'discord.js';
-import { joinVoiceChannel, VoiceConnectionStatus, entersState } from '@discordjs/voice';
 
 // منع معالجة الرسائل المكررة
 const processedMessages = new Set();
 
-// تخزين حالة الاتصال الصوتي لمنع تكرار الانضمام وللبقاء 24 ساعة
+// تخزين حالة الاتصال الصوتي لمنع تكرار الانضمام
 let persistentConnection = null;
 
 // ==========================================
@@ -66,7 +65,7 @@ export default {
     }
 
     // ==========================================
-    // 3. الأوامر الإدارية والصوتية المختصرة
+    // 3. الأوامر الإدارية والصوتية المختصرة (24/7)
     // ==========================================
 
     // أ) امر دخول الفويس والبقاء بشكل دائم (join)
@@ -80,6 +79,9 @@ export default {
           return message.reply('❌ لم يتم العثور على الروم الصوتي المحدد!').catch(() => {});
         }
 
+        const { joinVoiceChannel, VoiceConnectionStatus, entersState } = await import('@discordjs/voice');
+        
+        // إذا كان متصلاً مسبقاً، لا داعي لإعادة الاتصال
         if (persistentConnection && persistentConnection.state.status !== VoiceConnectionStatus.Destroyed) {
           return message.reply(`✅ البوت متواجد بالفعل في الروم الصوتي بشكل دائم!`).catch(() => {});
         }
@@ -94,11 +96,13 @@ export default {
 
         persistentConnection = connection;
 
+        // نظام إعادة الاتصال التلقائي في حال انقطاع الاتصال للبقاء 24 ساعة
         connection.on(VoiceConnectionStatus.Disconnected, async () => {
           try {
             await entersState(connection, VoiceConnectionStatus.Connecting, 5_000);
           } catch {
             try {
+              // محاولة إعادة الاتصال بالروم تلقائياً
               persistentConnection = joinVoiceChannel({
                 channelId: channel.id,
                 guildId: guild.id,
@@ -112,7 +116,7 @@ export default {
           }
         });
 
-        await message.reply(`✅ تم بنجاح! البوت الآن متواجد في روم: **${channel.name}** وسيبقى متصلاً 24 ساعة.`).catch(() => {});
+        await message.reply(`✅ تم بنجاح! البوت الآن متواجد في روم: **${nameOfChannel(channel)}** وسيبقى متصلاً 24 ساعة.`).catch(() => {});
       } catch (err) {
         console.error(err);
         await message.reply('❌ حدث خطأ أثناء محاولة دخول البوت للفويس.').catch(() => {});
@@ -220,3 +224,7 @@ export default {
     }
   }
 };
+
+function nameOfChannel(channel) {
+  return channel.name;
+}
