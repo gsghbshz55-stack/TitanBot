@@ -62,10 +62,47 @@ export default {
     }
 
     // ==========================================
-    // 3. الأوامر الإدارية المختصرة
+    // 3. الأوامر الإدارية والصوتية المختصرة
     // ==========================================
 
-    // أ) امر المسح (مسح 9)
+    // أ) امر دخول الفويس (join)
+    if (command === 'join') {
+      try {
+        const targetVoiceChannelId = '1415546159417655346';
+        const guild = message.guild;
+        const channel = await guild.channels.fetch(targetVoiceChannelId).catch(() => null);
+
+        if (!channel) {
+          return message.reply('❌ لم يتم العثور على الروم الصوتي المحدد!').catch(() => {});
+        }
+
+        const { joinVoiceChannel, VoiceConnectionStatus, entersState } = await import('@discordjs/voice');
+        
+        const connection = joinVoiceChannel({
+          channelId: channel.id,
+          guildId: guild.id,
+          adapterCreator: guild.voiceAdapterCreator,
+          selfDeaf: true,
+          selfMute: true
+        });
+
+        connection.on(VoiceConnectionStatus.Disconnected, async () => {
+          try {
+            await entersState(connection, VoiceConnectionStatus.Connecting, 5_000);
+          } catch {
+            connection.destroy();
+          }
+        });
+
+        await message.reply(`✅ تم بنجاح! البوت الآن متواجد في روم: **${channel.name}**`).catch(() => {});
+      } catch (err) {
+        console.error(err);
+        await message.reply('❌ حدث خطأ أثناء محاولة دخول البوت للفويس.').catch(() => {});
+      }
+      return;
+    }
+
+    // ب) امر المسح (مسح 9)
     if (command === 'مسح') {
       const amount = parseInt(args[1]);
       if (isNaN(amount) || amount < 1 || amount > 100) {
@@ -82,7 +119,7 @@ export default {
       return;
     }
 
-    // ب) امر الحظر (تف @user السبب)
+    // ج) امر الحظر (تف @user السبب)
     if (command === 'تف') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص المراد حظره (مثال: `تف @user`).').catch(() => {});
@@ -94,7 +131,7 @@ export default {
       return;
     }
 
-    // ج) امر السحب (ايا @user)
+    // د) امر السحب (ايا @user)
     if (command === 'ايا') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `ايا @user`).').catch(() => {});
@@ -108,7 +145,7 @@ export default {
       return;
     }
 
-    // د) امر الطرد من الصوت (قود @user)
+    // هـ) امر الطرد من الصوت (قود @user)
     if (command === 'قود') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `قود @user`).').catch(() => {});
@@ -119,7 +156,7 @@ export default {
       return;
     }
 
-    // هـ) امر الميوت الصوتي (اسكت @user)
+    // و) امر الميوت الصوتي (اسكت @user)
     if (command === 'اسكت') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `اسكت @user`).').catch(() => {});
@@ -136,7 +173,7 @@ export default {
       return;
     }
 
-    // و) امر التايم أوت (تايم @user 10m)
+    // ز) امر التايم أوت (تايم @user 10m)
     if (command === 'تايم') {
       const targetMember = message.mentions.members.first();
       if (!targetMember) return message.reply('❌ يرجى منشن الشخص وكتابة المدة (مثال: `تايم @user 10m`).').catch(() => {});
