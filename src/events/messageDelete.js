@@ -4,13 +4,52 @@ import { logger } from '../utils/logger.js';
 // آيدي روم الاقتراحات
 const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 
+// آيدي روم الضريبة المحدد (اختياري، اتركه فارغاً '' لو تريده يعمل في كل الرومات، أو ضع آيدي الروم هنا)
+const TAX_CHANNEL_ID = '1415584488401928292';
+
 export default {
   name: Events.MessageCreate,
   async execute(message, client) {
     try {
       if (message.author.bot || !message.guild) return;
 
-      // 1. نظام الاقتراحات التلقائي
+      const content = message.content ? message.content.trim() : '';
+      const args = content.split(/\s+/);
+      const command = args[0].toLowerCase();
+
+      // ==========================================
+      // 1. نظام حساب الضريبة (Tax) مع دعم k و m
+      // ==========================================
+      if (command === 'tax' || command === 'ضريبة') {
+        // إذا أردت تقييد أمر الضريبة بروم معين، قم بإلغاء التفعيل للشرط التالي
+        if (TAX_CHANNEL_ID && message.channel.id !== TAX_CHANNEL_ID) return;
+
+        const input = args[1];
+        if (!input) {
+          return message.reply('❌ يرجى كتابة المبلغ المراد حساب ضريبته (مثال: `tax 100k` أو `tax 1m`).').catch(() => {});
+        }
+
+        let amount = parseTaxInput(input);
+        if (isNaN(amount) || amount <= 0) {
+          return message.reply('❌ يرجى كتابة رقم صحيح أو استخدام اختصارات صحيحة (مثل: `100k`, `1.5m`, `5000`).').catch(() => {});
+        }
+
+        // الحسابات والنسب تماماً مثل الصورة
+        const botTax = Math.ceil(amount * 20 / 19); // ضريبة بروبوت
+        const mediatorPercentage = 2; // نسبة الوسيط 2%
+        const mediatorFee = Math.ceil(amount * (mediatorPercentage / 100));
+        const totalWithMediator = amount + mediatorFee;
+        const fullTaxWithMediator = Math.ceil(totalWithMediator * 20 / 19);
+
+        // تنسيق الناتج بنفس شكل الصورة بالضبط
+        const resultText = `> * المبلغ: **${formatNumber(amount)}**\n> * ضريبة بروبوت: **${formatNumber(botTax)}**\n> * المبلغ كامل مع ضريبة الوسيط: **${formatNumber(totalWithMediator)}**\n> * نسبة الوسيط %2: **${formatNumber(mediatorFee)}**\n> * الضريبة كاملة مع نسبة الوسيط: **${formatNumber(fullTaxWithMediator)}**`;
+
+        return message.reply(resultText).catch(() => {});
+      }
+
+      // ==========================================
+      // 2. نظام الاقتراحات التلقائي
+      // ==========================================
       if (message.channel.id === SUGGESTIONS_CHANNEL_ID) {
         const suggestionText = message.content;
         if (!suggestionText) return;
@@ -67,7 +106,9 @@ export default {
         return;
       }
 
-      // 2. نظام تغيير اسم التكت تلقائياً
+      // ==========================================
+      // 3. نظام تغيير اسم التكت تلقائياً
+      // ==========================================
       await handleTicketAutoRename(message);
 
     } catch (error) {
@@ -76,6 +117,28 @@ export default {
   },
 };
 
+// دوال المساعدة للضريبة (Tax)
+function parseTaxInput(input) {
+  let cleanInput = input.toLowerCase().replace(/,/g, '');
+  let multiplier = 1;
+
+  if (cleanInput.endsWith('k')) {
+    multiplier = 1000;
+    cleanInput = cleanInput.slice(0, -1);
+  } else if (cleanInput.endsWith('m')) {
+    multiplier = 1000000;
+    cleanInput = cleanInput.slice(0, -1);
+  }
+
+  const number = parseFloat(cleanInput);
+  return isNaN(number) ? NaN : Math.floor(number * multiplier);
+}
+
+function formatNumber(num) {
+  return num.toLocaleString('en-US');
+}
+
+// دالة تغيير اسم التكت
 async function handleTicketAutoRename(message) {
   try {
     const channel = message.channel;
