@@ -156,7 +156,7 @@ async function handleTicketAutoRename(message) {
       const newName = `${ticketNumber}-${cleanWord}`;
 
       await channel.send({
-        content: `**مرحباً بك، سيتم تغيير اسم التكت بناءً على رسالتك لتسهيل الدعم الفني. شكراً لك!🤍**`
+        content: `** 1414758130361044992 1391735874924052560**`
       }).catch(() => {});
 
       await channel.setName(newName);
