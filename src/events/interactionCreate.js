@@ -2,7 +2,6 @@ import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } fr
 import { logger } from '../utils/logger.js';
 
 // آيديات الرومات
-const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 const FEEDBACK_CHANNEL_ID = '1391737804781916160';
 const TAX_CHANNEL_ID = '1415584488401928292'; // روم الضريبة التلقائي
 
@@ -90,45 +89,7 @@ export default {
         return;
       }
 
-      // 2. نظام الاقتراحات التلقائي
-      if (message.channel.id === SUGGESTIONS_CHANNEL_ID) {
-        const suggestionText = message.content;
-        if (!suggestionText) return;
-
-        if (processedMessages.has(message.id)) return;
-        processedMessages.add(message.id);
-        setTimeout(() => processedMessages.delete(message.id), 60000);
-
-        await message.delete().catch(() => {});
-
-        const lineGifUrl = 'https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac39330&is=6ac241b0&hm=a59fa9266ef864e2fbf9d7f6b1d369c6fb4381d859482fab5f15a31dbf48187d&';
-
-        const suggestEmbed = new EmbedBuilder()
-          .setAuthor({
-            name: `Suggested by ${message.author.username}`,
-            iconURL: message.author.displayAvatarURL({ dynamic: true })
-          })
-          .setDescription(suggestionText)
-          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-          .setImage(lineGifUrl)
-          .setColor('#2b2d31');
-
-        const sentMessage = await message.channel.send({
-          embeds: [suggestEmbed]
-        }).catch((err) => {
-          logger.error('Failed to send suggestion embed:', err);
-        });
-
-        if (sentMessage) {
-          await sentMessage.startThread({
-            name: `Discussion - ${message.author.username}`,
-            autoArchiveDuration: 1440,
-          }).catch(() => {});
-        }
-        return;
-      }
-
-      // 3. نظام الآراء (Feedback)
+      // 2. نظام الآراء (Feedback)
       if (message.channel.id === FEEDBACK_CHANNEL_ID) {
         const feedbackText = message.content;
         const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
@@ -167,7 +128,7 @@ export default {
         return;
       }
 
-      // 4. نظام تغيير اسم التكت تلقائياً
+      // 3. نظام تغيير اسم التكت تلقائياً
       await handleTicketAutoRename(message);
 
     } catch (error) {
