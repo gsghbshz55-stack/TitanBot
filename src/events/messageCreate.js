@@ -1,4 +1,3 @@
-
 import { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { logger } from '../utils/logger.js';
 
@@ -90,7 +89,7 @@ export default {
       }
 
       // ==========================================
-      // 2. نظام الآراء (Feedback)
+      // 2. نظام الآراء والاقتراحات (Feedback)
       // ==========================================
       if (message.channel.id === FEEDBACK_CHANNEL_ID) {
         const feedbackText = message.content;
@@ -106,7 +105,7 @@ export default {
         const feedbackEmbed = new EmbedBuilder()
           .setColor('#ff334b')
           .setAuthor({
-            name: `ملاحظات المستخدم: ${message.author.username}`,
+            name: `مقترح/رأي من: ${message.author.username}`,
             iconURL: message.author.displayAvatarURL({ dynamic: true })
           })
           .setDescription(feedbackText ? `> ${feedbackText}` : '*(مرفق صورة بدون نص)*')
@@ -121,11 +120,17 @@ export default {
           feedbackEmbed.setImage(attachedImage);
         }
 
-        await message.channel.send({
+        const sentMessage = await message.channel.send({
           embeds: [feedbackEmbed]
         }).catch((err) => {
           logger.error('Failed to send feedback embed:', err);
         });
+
+        // إضافة تفاعلات التصويت تلقائياً للاقتراح
+        if (sentMessage) {
+          await sentMessage.react('👍').catch(() => {});
+          await sentMessage.react('👎').catch(() => {});
+        }
 
         return;
       }
