@@ -6,6 +6,12 @@ const SUGGESTIONS_CHANNEL_ID = '1437792846907183165';
 const FEEDBACK_CHANNEL_ID = '1391737804781916160';
 const TAX_CHANNEL_ID = '1415584488401928292'; // روم الضريبة التلقائي
 
+// الرتب المسموح لها باستخدام الأوامر والردود التلقائية (أي شخص يحمل إحدى هذه الرتب)
+const ALLOWED_ROLES = [
+  '1414751141706731691', // الرتبة القديمة
+  '1391735874924052560', // الرتبة الجديدة التي أضفتها
+];
+
 // مجموعة لحفظ آيديات الرسائل لمنع التكرار
 const processedMessages = new Set();
 
@@ -20,7 +26,6 @@ export default {
         const cleanContent = message.content.trim().toLowerCase();
         let amount = null;
 
-        // التحقق مما إذا كان المدخل رقماً عادياً أو يحتوي على اختصارات (k, m, b)
         const match = cleanContent.match(/^(\d+(?:\.\d+)?)([kmb])?$/);
         
         if (match) {
@@ -43,12 +48,10 @@ export default {
           processedMessages.add(message.id);
           setTimeout(() => processedMessages.delete(message.id), 60000);
 
-          // حذف رسالة العضو الأصلية
           await message.delete().catch(() => {});
 
-          // حساب الضرائب بدقة
           const taxPro = Math.floor(amount * 20 / 19);
-          const mediatorFee = Math.floor(amount * 0.02); // نسبة الوسيط 2%
+          const mediatorFee = Math.floor(amount * 0.02);
           const totalWithAll = taxPro + mediatorFee;
 
           const taxEmbed = new EmbedBuilder()
@@ -164,6 +167,45 @@ export default {
           logger.error('Failed to send feedback embed:', err);
         });
 
+        return;
+      }
+
+      // معالجة الرسائل العادية والردود والأوامر
+      if (processedMessages.has(message.id)) return;
+      processedMessages.add(message.id);
+      setTimeout(() => processedMessages.delete(message.id), 5000);
+
+      const content = message.content.trim();
+      const args = content.split(/\s+/);
+      const command = args[0].toLowerCase();
+
+      // أ) الردود العامة المتاحة للجميع
+      if (command === 'ip') {
+        await message.reply('144.217.62.159:7777').catch(() => {});
+        return;
+      } else if (command === 'fayt') {
+        await message.reply('pr.sampdroid.app:7777').catch(() => {});
+        return;
+      }
+
+      // التحقق مما إذا كان المستخدم يمتلك إحدى الرتب المسموح لها
+      const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
+      if (!hasAllowedRole) {
+        // إذا لم يكن يمتلك الرتبة، نتحقق فقط مما إذا كان تكت لتغيير الاسم تلقائياً
+        await handleTicketAutoRename(message);
+        return;
+      }
+
+      // ب) الردود التلقائية الخاصة بالرتب المسموحة (خط، رابط، تفضل)
+      if (command === 'رابط') {
+        await message.reply('𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq').catch(() => {});
+        return;
+      } else if (command === 'خط') {
+        await message.reply('https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&').catch(() => {});
+        return;
+      } else if (command === 'تفضل') {
+        const welcomeText = `> **السلام عليڪم**\n> **هـنـا طـاقـم عمـل**\n\n> **معـڪ الـعضو <@${message.author.id}> ڪيف يمكـنـني خدمتك :**\nhttps://cdn.discordapp.com/attachments/1399176418415607870/1468651951339339796/1339174610775703626.gif?ex=6984cc37&is=69837ab7&hm=72ae6401246f68cb693b3517d083d6d3ffcfc00ff35d561f5c7628cf48469052&`;
+        await message.reply(welcomeText).catch(() => {});
         return;
       }
 
