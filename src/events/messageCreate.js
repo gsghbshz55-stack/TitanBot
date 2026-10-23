@@ -197,11 +197,11 @@ export default {
         return;
       }
 
-      // ب) التحقق مما إذا كان المستخدم يمتلك إحدى الرتب المسموح لها
+      // ب) التحقق من وجود إحدى الرتب المسموح لها
       const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
 
       if (hasAllowedRole) {
-        // 1. الردود التلقائية (خط، رابط، تفضل) مع دعم الرد على رسائل البوتات وحذف رسالتك
+        // 1. الردود التلقائية المختصرة (مع حذف الرسالة ودعم الرد على البوتات)
         if (command === 'رابط' || command === 'خط' || command === 'تفضل') {
           const referencedMessage = message.reference ? await message.channel.messages.fetch(message.reference.messageId).catch(() => null) : null;
           
@@ -224,7 +224,7 @@ export default {
           return;
         }
 
-        // 2. أمر حذف جميع تكتات السيرفر (`حذف_التكتات` أو `deltickets`)
+        // 2. أمر حذف جميع التكتات (`حذف_التكتات` أو `deltickets`)
         if (command === 'حذف_التكتات' || command === 'deltickets') {
           const statusMsg = await message.reply('⏳ جاري مسح جميع رومات التكت في السيرفر...').catch(() => null);
 
@@ -336,7 +336,7 @@ export default {
           if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
 
           await targetMember.voice.disconnect().catch(() => {});
-          await message.reply(`🚪 تم طرد ${targetMember.user.tag} من الروم الصوتي.').catch(() => {});
+          await message.reply(`🚪 تم طرد ${targetMember.user.tag} من الروم الصوتي.`).catch(() => {});
           return;
         }
 
@@ -385,7 +385,7 @@ export default {
       }
 
       // ==========================================
-      // 5. نظام تغيير اسم التكت تلقائياً (لأي عضو داخل التكتات)
+      // 5. نظام تغيير اسم التكت تلقائياً
       // ==========================================
       await handleTicketAutoRename(message);
 
