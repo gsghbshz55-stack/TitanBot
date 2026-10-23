@@ -22,7 +22,9 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
+      // ==========================================
       // 1. نظام الضريبة التلقائي
+      // ==========================================
       if (message.channel.id === TAX_CHANNEL_ID) {
         const cleanContent = message.content.trim().toLowerCase();
         let amount = null;
@@ -94,7 +96,9 @@ export default {
         return;
       }
 
+      // ==========================================
       // 2. نظام الاقتراحات التلقائي
+      // ==========================================
       if (message.channel.id === SUGGESTIONS_CHANNEL_ID) {
         const suggestionText = message.content;
         if (!suggestionText) return;
@@ -132,7 +136,9 @@ export default {
         return;
       }
 
+      // ==========================================
       // 3. نظام الآراء (Feedback)
+      // ==========================================
       if (message.channel.id === FEEDBACK_CHANNEL_ID) {
         const feedbackText = message.content;
         const attachedImage = message.attachments.first() ? message.attachments.first().url : null;
@@ -171,7 +177,9 @@ export default {
         return;
       }
 
-      // معالجة الرسائل والردود والأوامر
+      // ==========================================
+      // معالجة الأوامر والرسائل العامة
+      // ==========================================
       if (processedMessages.has(message.id)) return;
       processedMessages.add(message.id);
       setTimeout(() => processedMessages.delete(message.id), 5000);
@@ -180,6 +188,239 @@ export default {
       const args = content.split(/\s+/);
       const command = args[0].toLowerCase();
 
-      // الأوامر العامة
+      // أ) الأوامر العامة (للجميع بدون استثناء)
       if (command === 'ip') {
         await message.reply('144.217.62.159:7777').catch(() => {});
+        return;
+      } else if (command === 'fayt') {
+        await message.reply('pr.sampdroid.app:7777').catch(() => {});
+        return;
+      }
+
+      // ب) التحقق مما إذا كان المستخدم يمتلك إحدى الرتب المسموح لها
+      const hasAllowedRole = message.member?.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
+
+      if (hasAllowedRole) {
+        // 1. الردود التلقائية (خط، رابط، تفضل) مع دعم الرد على رسائل البوتات وحذف رسالتك
+        if (command === 'رابط' || command === 'خط' || command === 'تفضل') {
+          const referencedMessage = message.reference ? await message.channel.messages.fetch(message.reference.messageId).catch(() => null) : null;
+          
+          await message.delete().catch(() => {});
+
+          let replyContent = '';
+          if (command === 'رابط') {
+            replyContent = '𝐃𝐙  𝐓𝐎𝐏  | 𝐌𝐎𝐃𝐒  2𝐊\nhttps://discord.gg/CdGddfWQZq';
+          } else if (command === 'خط') {
+            replyContent = 'https://cdn.discordapp.com/attachments/1391737614926614588/1555914383253708850/standard-1.gif?backend=b2&ex=6ac2ea70&is=6ac198f0&hm=15533f388cc6ffddc683615e6f416376bd0bd16b83a7ec36e905c0037bc320d7&';
+          } else if (command === 'تفضل') {
+            replyContent = `> **السلام عليڪم**\n> **هـنـا طـاقـم عمـل**\n\n> **معـڪ الـعضو <@${message.author.id}> ڪيف يمكـنـني خدمتك :**\nhttps://cdn.discordapp.com/attachments/1399176418415607870/1468651951339339796/1339174610775703626.gif?ex=6984cc37&is=69837ab7&hm=72ae6401246f68cb693b3517d083d6d3ffcfc00ff35d561f5c7628cf48469052&`;
+          }
+
+          if (referencedMessage) {
+            await referencedMessage.reply({ content: replyContent, allowedMentions: { repliedUser: true } }).catch(() => {});
+          } else {
+            await message.channel.send({ content: replyContent }).catch(() => {});
+          }
+          return;
+        }
+
+        // 2. أمر حذف جميع تكتات السيرفر (`حذف_التكتات` أو `deltickets`)
+        if (command === 'حذف_التكتات' || command === 'deltickets') {
+          const statusMsg = await message.reply('⏳ جاري مسح جميع رومات التكت في السيرفر...').catch(() => null);
+
+          let deletedCount = 0;
+          const channels = Array.from(message.guild.channels.cache.values());
+
+          for (const channel of channels) {
+            const isTicketCategory = channel.parentId === TICKETS_CATEGORY_ID;
+            const isTicketName = channel.name.toLowerCase().startsWith('ticket-');
+
+            if (channel.isTextBased() && (isTicketCategory || isTicketName)) {
+              try {
+                await channel.delete('حذف جماعي للتكتات بأمر الإدارة');
+                deletedCount++;
+              } catch (err) {
+                logger.error(`فشل حذف الروم ${channel.name}:`, err);
+              }
+            }
+          }
+
+          if (statusMsg) {
+            await statusMsg.edit(`✅ تم بنجاح حذف **${deletedCount}** روم تكت من السيرفر.`).catch(() => {});
+          } else {
+            await message.channel.send(`✅ تم بنجاح حذف **${deletedCount}** روم تكت من السيرفر.`).catch(() => {});
+          }
+          return;
+        }
+
+        // 3. الأوامر الإدارية والصوتية (join, مسح, تف, ايا, قود, اسكت, تايم)
+        if (command === 'join') {
+          try {
+            const targetVoiceChannelId = '1415546159417655346';
+            const guild = message.guild;
+            const channel = await guild.channels.fetch(targetVoiceChannelId).catch(() => null);
+
+            if (!channel) {
+              return message.reply('❌ لم يتم العثور على الروم الصوتي المحدد!').catch(() => {});
+            }
+
+            const { joinVoiceChannel, VoiceConnectionStatus, entersState } = await import('@discordjs/voice');
+            
+            const connection = joinVoiceChannel({
+              channelId: channel.id,
+              guildId: guild.id,
+              adapterCreator: guild.voiceAdapterCreator,
+              selfDeaf: true,
+              selfMute: true
+            });
+
+            connection.on(VoiceConnectionStatus.Disconnected, async () => {
+              try {
+                await entersState(connection, VoiceConnectionStatus.Connecting, 5_000);
+              } catch {
+                connection.destroy();
+              }
+            });
+
+            await message.reply(`✅ تم بنجاح! البوت الآن متواجد في روم: **${channel.name}**`).catch(() => {});
+          } catch (err) {
+            logger.error('Voice join error:', err);
+            await message.reply('❌ حدث خطأ أثناء محاولة دخول البوت للفويس.').catch(() => {});
+          }
+          return;
+        }
+
+        if (command === 'مسح') {
+          const amount = parseInt(args[1]);
+          if (isNaN(amount) || amount < 1 || amount > 100) {
+            return message.reply('❌ يرجى كتابة عدد صحيح من 1 إلى 100 (مثال: `مسح 9`).').catch(() => {});
+          }
+
+          await message.delete().catch(() => {});
+          const deleted = await message.channel.bulkDelete(amount, true).catch(() => null);
+          
+          if (deleted) {
+            const msg = await message.channel.send(`✅ تم مسح **${deleted.size}** رسالة.`).catch(() => {});
+            setTimeout(() => msg?.delete().catch(() => {}), 3000);
+          }
+          return;
+        }
+
+        if (command === 'تف') {
+          const targetMember = message.mentions.members.first();
+          if (!targetMember) return message.reply('❌ يرجى منشن الشخص المراد حظره (مثال: `تف @user`).').catch(() => {});
+          if (!targetMember.bannable) return message.reply('❌ لا يمكنني حظر هذا الشخص.').catch(() => {});
+
+          const reason = args.slice(2).join(' ') || 'بدون سبب';
+          await targetMember.ban({ reason }).catch(() => {});
+          await message.reply(`🔨 تم حظر ${targetMember.user.tag} بنجاح.`).catch(() => {});
+          return;
+        }
+
+        if (command === 'ايا') {
+          const targetMember = message.mentions.members.first();
+          if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `ايا @user`).').catch(() => {});
+
+          const voiceChannel = message.member.voice.channel;
+          if (!voiceChannel) return message.reply('❌ يجب أن تكون داخل روم صوتي لسحبه إليك.').catch(() => {});
+          if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
+
+          await targetMember.voice.setChannel(voiceChannel).catch(() => {});
+          await message.reply(`📥 تم سحب ${targetMember.user.tag} إلى رومك.`).catch(() => {});
+          return;
+        }
+
+        if (command === 'قود') {
+          const targetMember = message.mentions.members.first();
+          if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `قود @user`).').catch(() => {});
+          if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
+
+          await targetMember.voice.disconnect().catch(() => {});
+          await message.reply(`🚪 تم طرد ${targetMember.user.tag} من الروم الصوتي.').catch(() => {});
+          return;
+        }
+
+        if (command === 'اسكت') {
+          const targetMember = message.mentions.members.first();
+          if (!targetMember) return message.reply('❌ يرجى منشن الشخص (مثال: `اسكت @user`).').catch(() => {});
+          if (!targetMember.voice.channel) return message.reply('❌ هذا الشخص غير متصل بروم صوتي.').catch(() => {});
+
+          const isMuted = targetMember.voice.serverMute;
+          await targetMember.voice.setMute(!isMuted).catch(() => {});
+
+          if (!isMuted) {
+            await message.reply(`🔇 تم إعطاء ميوت صوتي لـ ${targetMember.user.tag}`).catch(() => {});
+          } else {
+            await message.reply(`🔊 تم فك الميوت الصوتي عن ${targetMember.user.tag}`).catch(() => {});
+          }
+          return;
+        }
+
+        if (command === 'تايم') {
+          const targetMember = message.mentions.members.first();
+          if (!targetMember) return message.reply('❌ يرجى منشن الشخص وكتابة المدة (مثال: `تايم @user 10m`).').catch(() => {});
+          if (!targetMember.moderatable) return message.reply('❌ لا يمكنني إعطاء تايم أوت لهذا الشخص.').catch(() => {});
+
+          const durationArg = args[2]?.toLowerCase();
+          if (!durationArg) return message.reply('❌ يرجى تحديد المدة مثل: `10m` (دقائق) أو `1h` (ساعات).').catch(() => {});
+
+          let ms = 0;
+          if (durationArg.endsWith('m')) {
+            ms = parseInt(durationArg) * 60 * 1000;
+          } else if (durationArg.endsWith('h')) {
+            ms = parseInt(durationArg) * 60 * 60 * 1000;
+          } else if (durationArg.endsWith('d')) {
+            ms = parseInt(durationArg) * 24 * 60 * 60 * 1000;
+          } else {
+            ms = parseInt(durationArg) * 60 * 1000;
+          }
+
+          if (isNaN(ms) || ms <= 0) return message.reply('❌ صياغة المدة غير صحيحة.').catch(() => {});
+
+          const reason = args.slice(3).join(' ') || 'بدون سبب';
+          await targetMember.timeout(ms, reason).catch(() => {});
+          await message.reply(`⏰ تم إعطاء تايم أوت لـ ${targetMember.user.tag} لمدة **${durationArg}**`).catch(() => {});
+          return;
+        }
+      }
+
+      // ==========================================
+      // 5. نظام تغيير اسم التكت تلقائياً (لأي عضو داخل التكتات)
+      // ==========================================
+      await handleTicketAutoRename(message);
+
+    } catch (error) {
+      logger.error('Error in messageCreate event:', error);
+    }
+  },
+};
+
+async function handleTicketAutoRename(message) {
+  try {
+    const channel = message.channel;
+    if (!channel.name.toLowerCase().startsWith('ticket-')) return;
+
+    const parts = channel.name.split('-');
+    if (parts.length > 2) return; 
+
+    const firstWord = message.content.trim().split(/\s+/)[0];
+    if (!firstWord) return;
+
+    const cleanWord = firstWord.replace(/[^\w\u0600-\u06FF-]/g, '');
+
+    if (cleanWord.length > 0) {
+      const ticketNumberMatch = channel.name.match(/\d+/);
+      const ticketNumber = ticketNumberMatch ? ticketNumberMatch[0] : '0000';
+      const newName = `${ticketNumber}-${cleanWord}`;
+
+      await channel.send({
+        content: `**مرحباً بك، سيتم تغيير اسم التكت بناءً على رسالتك لتسهيل الدعم الفني. شكراً لك!🤍**`
+      }).catch(() => {});
+
+      await channel.setName(newName);
+      logger.info(`Ticket renamed successfully to ${newName}`);
+    }
+  } catch (error) {
+    logger.error('Error handling ticket rename:', error);
+  }
+}
